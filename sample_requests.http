@@ -1,0 +1,9 @@
+### POST request to example server
+POST http://localhost:3000/referral
+Content-Type: application/json
+
+{
+  "question": "What could a cough be a symptom of?"
+}
+
+###
