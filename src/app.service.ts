@@ -1,17 +1,14 @@
 import { Injectable } from '@nestjs/common';
-import {
-  GoogleGenerativeAI,
-  GenerativeModel,
-  GenerateContentResult,
-} from '@google/generative-ai';
+import { generateText, LanguageModelV1 } from 'ai';
+import { anthropic } from '@ai-sdk/anthropic';
+import { google } from '@ai-sdk/google';
 import { ReferralRequest } from '../models/referralRequest';
 
-const genAI: GoogleGenerativeAI = new GoogleGenerativeAI(
-  process.env.API_KEY as string,
-);
-const model: GenerativeModel = genAI.getGenerativeModel({
-  model: 'gemini-1.5-flash',
-});
+enum AIProvider {
+  Claude = 'CLAUDE',
+  Gemini = 'GEMINI',
+  // TODO add further models
+}
 
 @Injectable()
 export class AppService {
@@ -21,10 +18,26 @@ export class AppService {
 
   async postReferralQuestion(request: ReferralRequest): Promise<string> {
     console.log('request: ', request);
-    const result: GenerateContentResult = await model.generateContent(
-      request.question,
-    );
-    console.log(result.response.text());
-    return result.response.text();
+
+    const input = {
+      model: this.selectModel(),
+      prompt: request.question,
+    };
+    const { text } = await generateText(input);
+
+    console.log(text);
+    return text;
+  }
+
+  // TODO determine appropriate return type
+  private selectModel(): LanguageModelV1 {
+    switch (String(process.env.AI_PROVIDER).toUpperCase() as AIProvider) {
+      case AIProvider.Claude:
+        return anthropic('claude-3-opus-20240229');
+      case AIProvider.Gemini:
+        return google('models/gemini-2.0-flash-exp');
+      default:
+        throw new Error('unknown AI_PROVIDER type selected');
+    }
   }
 }
