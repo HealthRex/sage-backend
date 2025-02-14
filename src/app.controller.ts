@@ -2,6 +2,7 @@ import { Body, Controller, Get, Post } from '@nestjs/common';
 import { AppService } from './app.service';
 
 import { ReferralRequest } from '../models/referralRequest';
+import { ReferralResponse } from '../models/referralResponse';
 
 @Controller()
 export class AppController {
@@ -15,7 +16,7 @@ export class AppController {
   @Post('/referral')
   async postReferralQuestion(
     @Body() request: ReferralRequest,
-  ): Promise<string> {
+  ): Promise<ReferralResponse> {
     console.log('controller request', request);
     return await this.appService.postReferralQuestion(request);
   }
