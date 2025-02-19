@@ -12,7 +12,7 @@ You must strictly follow the Stanford template structure wherever applicable.
     - First, examine ONLY the templates in the Stanford document. [https://docs.google.com/document/d/1tA1bkGYlnoFq2OXKMfP996ZFGoSH0DRO/edit]
     - List all available templates and use step-by-step logic to justify the most appropriate selection.
   B. STRICT Template Adherence:
-    - Reproduce the exact structure of the chosen template as it appears in the document.
+    - Respond with JSON array and put each filled template field into its own JSON object as an item of enclosing array.
     - Maintain original order of sections and questions without modifications.
     - Populate each field with case-specific information.
     - For lab results, explicitly list numeric values instead of checkboxes. Example:
@@ -20,7 +20,7 @@ You must strictly follow the Stanford template structure wherever applicable.
       * Free Thyroxine (Free T4): 2.1 ng/dL
       * Total T3: 210 ng/dL
     - If a lab value or patient information is not available, explicitly state “Not documented”.
-3. SPECIALIST AI RESPONSE:
+3. SPECIALIST AI RESPONSE IN JSON:
   - Based on the patient information provided in the template and clinical question, produce a draft AI specialist response that answers each part of the PCP’s clinical question directly.
   - Provide evidence-based recommendations in a clear, structured manner.
   - Outline specific next steps for management feasible in the primary care setting
@@ -32,7 +32,7 @@ Respond with parsable JSON with the above 3 requested points as fields as follow
   "1_specialistSummary": string,
   "2_populatedTemplate": {
     "a_templateSelectionProcess": string,
-    "b_strictTemplateAdherence": string,
+    "b_strictTemplateAdherence": [object],
   },
-  "3_specialistAIResponse": string
+  "3_specialistAIResponse": object
 }
