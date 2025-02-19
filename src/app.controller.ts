@@ -3,6 +3,7 @@ import { AppService } from './app.service';
 
 import { ReferralRequest } from '../models/referralRequest';
 import { ReferralResponse } from '../models/referralResponse';
+import { ApiCreatedResponse } from '@nestjs/swagger';
 
 @Controller()
 export class AppController {
@@ -14,6 +15,10 @@ export class AppController {
   }
 
   @Post('/referral')
+  @ApiCreatedResponse({
+    description: 'Successfully received AI response to clinical question.',
+    type: ReferralResponse,
+  })
   async postReferralQuestion(
     @Body() request: ReferralRequest,
   ): Promise<ReferralResponse> {
