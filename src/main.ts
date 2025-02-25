@@ -4,6 +4,11 @@ import { AppModule } from './app.module';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+  app.enableCors({
+    origin: '*', // TODO Allow only frontend origin
+    methods: ['GET', 'POST'],
+    allowedHeaders: ['Content-Type'],
+  });
 
   const config = new DocumentBuilder()
     .setTitle('Referral service')
