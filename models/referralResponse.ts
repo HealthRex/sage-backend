@@ -27,8 +27,17 @@ export class ReferralResponse {
   @ApiProperty({ description: 'Template selection process explanation' })
   templateSelectionProcess: string;
 
-  @ApiProperty({ description: 'Populated template' })
-  populatedTemplate: object[];
+  @ApiProperty({
+    description: 'Populated template',
+    type: 'array',
+    items: {
+      type: 'object',
+      additionalProperties: {
+        type: 'string',
+      },
+    },
+  })
+  populatedTemplate: Record<string, string>[];
 
   @ApiProperty({ description: 'Specialist AI response' })
   specialistAIResponse: SpecialistAIResponse;

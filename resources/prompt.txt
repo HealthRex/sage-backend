@@ -11,7 +11,7 @@ Generate JSON object with the following fields:
   - Focus on findings that impact management
 - Field: templateSelectionProcess:
   - First, examine ONLY the templates in the Stanford document. [https://docs.google.com/document/d/1tA1bkGYlnoFq2OXKMfP996ZFGoSH0DRO/edit]
-  - List all available templates and use step-by-step logic to justify the most appropriate selection.
+  - Mention all available templates and use step-by-step logic to justify the most appropriate selection.
 - Field: populatedTemplate (STRICT FORMAT AND TEMPLATE ADHERENCE AND LAB VALUE INCLUSION REQUIRED):
   - Respond with JSON array and put each filled template field into its own JSON object as an item of enclosing array.
   - Maintain original order of sections and questions without modifications.
