@@ -118,7 +118,7 @@ export class AppService {
       case AIProvider.Claude:
         return anthropic('claude-3-opus-20240229');
       case AIProvider.Gemini:
-        return google('models/gemini-2.0-flash-exp');
+        return google('models/gemini-2.0-flash');
       default:
         throw new Error('unknown AI_PROVIDER type selected');
     }
