@@ -41,7 +41,8 @@ export class AppService {
 
     const systemPrompt: string = fs
       .readFileSync(join(process.cwd(), systemPromptFilePath))
-      .toString();
+      .toString()
+      .replace('{{TemplateGoogleDocLink}}', bestTemplate);
 
     // const referralTemplatesBase64: string = Buffer.from(
     //   fs.readFileSync(referralTemplateFilePath).toString(),
