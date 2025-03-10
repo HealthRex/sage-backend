@@ -2,10 +2,11 @@ import { Injectable } from '@nestjs/common';
 import { generateText, LanguageModelV1 } from 'ai';
 import { anthropic } from '@ai-sdk/anthropic';
 import { google } from '@ai-sdk/google';
-import { ReferralRequest } from '../models/referralRequest';
+import { ReferralRequest } from './models/referralRequest';
 import * as fs from 'node:fs';
 import { join } from 'path';
-import { ReferralResponse } from '../models/referralResponse';
+import { ReferralResponse } from './models/referralResponse';
+import { TemplateSelectorService } from './template-selector/template-selector.service';
 
 enum AIProvider {
   Claude = 'CLAUDE',
@@ -36,6 +37,10 @@ const systemPromptFilePath: string = './resources/prompt.txt';
 
 @Injectable()
 export class AppService {
+  constructor(
+    private readonly templateSelectorService: TemplateSelectorService,
+  ) {}
+
   getHello(): string {
     return 'Hello World!';
   }
@@ -44,6 +49,11 @@ export class AppService {
     request: ReferralRequest,
   ): Promise<ReferralResponse> {
     console.log('request: ', request);
+
+    const bestTemplate = await this.templateSelectorService.selectBestTemplate(
+      request.question,
+    );
+    console.log('bestTemplate', bestTemplate);
 
     const systemPrompt: string = fs
       .readFileSync(join(process.cwd(), systemPromptFilePath))

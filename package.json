@@ -23,6 +23,7 @@
     "@ai-sdk/anthropic": "^1.1.5",
     "@ai-sdk/google": "^1.1.9",
     "@google/generative-ai": "^0.21.0",
+    "@nestjs/axios": "^4.0.0",
     "@nestjs/common": "^11.0.1",
     "@nestjs/config": "^4.0.0",
     "@nestjs/core": "^11.0.1",
