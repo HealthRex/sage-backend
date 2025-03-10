@@ -13,22 +13,6 @@ enum AIProvider {
   // TODO add further models
 }
 
-const patientIdToFiles = new Map<number, string>([
-  [69, './resources/case_69.txt'],
-  [11, './resources/case_11.txt'],
-  [21, './resources/case_21.txt'],
-  [37, './resources/case_37.txt'],
-  [59, './resources/case_59.txt'],
-  [72, './resources/case_72.txt'],
-  [74, './resources/case_74.txt'],
-  [76, './resources/case_76.txt'],
-  [85, './resources/case_85.txt'],
-  [101, './resources/case_101.txt'],
-]);
-const defaultPatientHistory: string = fs
-  .readFileSync(join(process.cwd(), './resources/case_69.txt'))
-  .toString();
-
 const systemPromptFilePath: string = './resources/prompt.txt';
 // const referralTemplateFileMimeType: string = 'application/pdf';
 // const referralTemplateFilePath: string =
@@ -53,19 +37,6 @@ export class AppService {
     //   fs.readFileSync(referralTemplateFilePath).toString(),
     // ).toString('base64');
 
-    let patientHistory: string = defaultPatientHistory;
-    if (patientIdToFiles.has(request.patientId)) {
-      patientHistory = fs
-        .readFileSync(
-          join(
-            process.cwd(),
-            patientIdToFiles.get(request.patientId) ??
-              './resources/case_69.txt',
-          ),
-        )
-        .toString();
-    }
-
     const input = {
       model: this.selectModel(),
       system: systemPrompt,
@@ -79,7 +50,7 @@ export class AppService {
             },
             {
               type: 'text',
-              text: patientHistory,
+              text: request.clinicalNotes,
             },
             // {
             //   type: 'file',
