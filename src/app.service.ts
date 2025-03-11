@@ -15,6 +15,9 @@ enum AIProvider {
 }
 
 const systemPromptFilePath: string = './resources/prompt.txt';
+const systemPromptWithoutTemplatesFilePath: string =
+  './resources/prompt_no_matched_templates.txt';
+
 // const referralTemplateFileMimeType: string = 'application/pdf';
 // const referralTemplateFilePath: string =
 //   './resources/Endocrinology eConsult Checklists FINAL 4.19.22.docx.pdf';
@@ -39,10 +42,17 @@ export class AppService {
     );
     console.log('bestTemplate', bestTemplate);
 
-    const systemPrompt: string = fs
-      .readFileSync(join(process.cwd(), systemPromptFilePath))
-      .toString()
-      .replace('{{TemplateGoogleDocLink}}', bestTemplate);
+    let systemPrompt: string;
+    if (bestTemplate) {
+      systemPrompt = fs
+        .readFileSync(join(process.cwd(), systemPromptFilePath))
+        .toString()
+        .replace('{{TemplateGoogleDocLink}}', bestTemplate);
+    } else {
+      systemPrompt = fs
+        .readFileSync(join(process.cwd(), systemPromptWithoutTemplatesFilePath))
+        .toString();
+    }
 
     // const referralTemplatesBase64: string = Buffer.from(
     //   fs.readFileSync(referralTemplateFilePath).toString(),
@@ -57,11 +67,11 @@ export class AppService {
           content: [
             {
               type: 'text',
-              text: request.question,
+              text: 'Clinical question: ' + request.question,
             },
             {
               type: 'text',
-              text: request.clinicalNotes,
+              text: 'Patient notes: ' + request.clinicalNotes,
             },
             // {
             //   type: 'file',
