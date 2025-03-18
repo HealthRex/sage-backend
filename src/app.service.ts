@@ -7,6 +7,8 @@ import * as fs from 'node:fs';
 import { join } from 'path';
 import { ReferralResponse } from './models/referralResponse';
 import { TemplateSelectorService } from './template-selector/template-selector.service';
+import { PathwayService } from './pathway/pathway.service';
+import { SpecialistAIResponse } from './models/specialistAIResponse';
 
 enum AIProvider {
   Claude = 'CLAUDE',
@@ -26,6 +28,7 @@ const systemPromptWithoutTemplatesFilePath: string =
 export class AppService {
   constructor(
     private readonly templateSelectorService: TemplateSelectorService,
+    private readonly pathwayService: PathwayService,
   ) {}
 
   getHello(): string {
@@ -36,23 +39,7 @@ export class AppService {
     request: ReferralRequest,
   ): Promise<ReferralResponse> {
     console.log('request: ', request);
-
-    const bestTemplate = await this.templateSelectorService.selectBestTemplate(
-      request.question,
-    );
-    console.log('bestTemplate', bestTemplate);
-
-    let systemPrompt: string;
-    if (bestTemplate) {
-      systemPrompt = fs
-        .readFileSync(join(process.cwd(), systemPromptFilePath))
-        .toString()
-        .replace('{{TemplateGoogleDocLink}}', bestTemplate);
-    } else {
-      systemPrompt = fs
-        .readFileSync(join(process.cwd(), systemPromptWithoutTemplatesFilePath))
-        .toString();
-    }
+    const systemPrompt = await this.selectSystemPrompt(request);
 
     // const referralTemplatesBase64: string = Buffer.from(
     //   fs.readFileSync(referralTemplateFilePath).toString(),
@@ -99,12 +86,48 @@ export class AppService {
     const response: ReferralResponse = JSON.parse(
       supposedJsonResponse,
     ) as ReferralResponse;
+    await this.replaceSpecialistResponseWithPathwayResponse(request, response);
+
     console.log(response);
 
     return response;
   }
 
-  // TODO determine appropriate return type
+  private async replaceSpecialistResponseWithPathwayResponse(
+    request: ReferralRequest,
+    response: ReferralResponse,
+  ) {
+    const pathwayResponse: SpecialistAIResponse =
+      await this.pathwayService.retrieveAnswer(
+        request.question,
+        request.clinicalNotes,
+        response.populatedTemplate,
+      );
+
+    if (pathwayResponse) {
+      response.specialistAIResponse = pathwayResponse;
+    }
+  }
+
+  private async selectSystemPrompt(request: ReferralRequest) {
+    const bestTemplate = await this.templateSelectorService.selectBestTemplate(
+      request.question,
+    );
+    console.log('bestTemplate', bestTemplate);
+
+    if (bestTemplate) {
+      return fs
+        .readFileSync(join(process.cwd(), systemPromptFilePath))
+        .toString()
+        .replace('{{TemplateGoogleDocLink}}', bestTemplate);
+    } else {
+      // no template selected
+      return fs
+        .readFileSync(join(process.cwd(), systemPromptWithoutTemplatesFilePath))
+        .toString();
+    }
+  }
+
   private selectModel(): LanguageModelV1 {
     switch (String(process.env.AI_PROVIDER).toUpperCase() as AIProvider) {
       case AIProvider.Claude:

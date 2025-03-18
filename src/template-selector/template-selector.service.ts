@@ -72,7 +72,7 @@ export class TemplateSelectorService {
       this.httpService
         .post<SelectBestTemplateResponse, SelectBestTemplateRequest>(
           // TODO get-template is wrong name for POST method - should be smth like select-best-template
-          String(process.env.EMBEDDINGS_API) + '/get-template',
+          String(process.env.EMBEDDINGS_API) + '/select-best-template',
           request,
         )
         .pipe(

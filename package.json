@@ -22,6 +22,7 @@
   "dependencies": {
     "@ai-sdk/anthropic": "^1.1.5",
     "@ai-sdk/google": "^1.1.9",
+    "@ai-sdk/openai": "^1.2.5",
     "@google/generative-ai": "^0.21.0",
     "@nestjs/axios": "^4.0.0",
     "@nestjs/common": "^11.0.1",
