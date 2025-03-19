@@ -1,8 +1,8 @@
 import { Body, Controller, Get, Post } from '@nestjs/common';
 import { AppService } from './app.service';
 
-import { ReferralRequest } from '../models/referralRequest';
-import { ReferralResponse } from '../models/referralResponse';
+import { ReferralRequest } from './models/referralRequest';
+import { ReferralResponse } from './models/referralResponse';
 import { ApiCreatedResponse } from '@nestjs/swagger';
 
 @Controller()
