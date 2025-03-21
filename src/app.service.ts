@@ -105,7 +105,9 @@ export class AppService {
       );
 
     if (pathwayResponse) {
-      response.specialistAIResponse = pathwayResponse;
+      response.specialistAIResponse.summaryResponse =
+        pathwayResponse.summaryResponse;
+      response.specialistAIResponse.citations = pathwayResponse.citations;
     }
   }
 
