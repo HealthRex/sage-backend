@@ -5,7 +5,8 @@ import { ValidationPipe } from '@nestjs/common';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, {
-    logger: ['error', 'warn'],
+    logger:
+      process.env.NODE_ENV === 'development' ? ['debug'] : ['error', 'warn'],
   });
 
   // config Validation

@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post } from '@nestjs/common';
+import { Body, Controller, Get, Logger, Post } from '@nestjs/common';
 import { AppService } from './app.service';
 
 import { ReferralRequest } from './models/referralRequest';
@@ -7,6 +7,8 @@ import { ApiCreatedResponse } from '@nestjs/swagger';
 
 @Controller()
 export class AppController {
+  private readonly logger = new Logger(AppController.name);
+
   constructor(private readonly appService: AppService) {}
 
   @Get()
@@ -22,7 +24,7 @@ export class AppController {
   async postReferralQuestion(
     @Body() request: ReferralRequest,
   ): Promise<ReferralResponse> {
-    console.log('controller request', request);
+    this.logger.debug('controller request', request);
     return await this.appService.postReferralQuestion(request);
   }
 }

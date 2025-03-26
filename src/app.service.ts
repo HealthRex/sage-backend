@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { generateText, LanguageModelV1 } from 'ai';
 import { anthropic } from '@ai-sdk/anthropic';
 import { google } from '@ai-sdk/google';
@@ -26,6 +26,8 @@ const systemPromptWithoutTemplatesFilePath: string =
 
 @Injectable()
 export class AppService {
+  private readonly logger = new Logger(AppService.name);
+
   constructor(
     private readonly templateSelectorService: TemplateSelectorService,
     private readonly pathwayService: PathwayService,
@@ -38,7 +40,7 @@ export class AppService {
   async postReferralQuestion(
     request: ReferralRequest,
   ): Promise<ReferralResponse> {
-    console.log('request: ', request);
+    this.logger.debug('request: ', request);
     const systemPrompt = await this.selectSystemPrompt(request);
 
     // const referralTemplatesBase64: string = Buffer.from(
@@ -70,25 +72,24 @@ export class AppService {
       ],
     };
 
-    // console.log('referralTemplatesBase64: ', referralTemplatesBase64);
-    console.log('input: ', input);
-    console.dir(input.messages[0].content);
+    // this.logger.debug('referralTemplatesBase64: ', referralTemplatesBase64);
+    this.logger.debug('input: ', input);
 
     // @ts-expect-error('input type is not recognized even though it matches to required type')
     const { text } = await generateText(input);
-    console.log(text);
+    this.logger.debug(text);
 
     const supposedJsonResponse: string = text
       .substring(text.indexOf('{'), text.lastIndexOf('}') + 1)
       .replaceAll(/\n/g, '');
-    console.log('supposedJsonResponse:', supposedJsonResponse);
+    this.logger.debug('supposedJsonResponse:', supposedJsonResponse);
 
     const response: ReferralResponse = JSON.parse(
       supposedJsonResponse,
     ) as ReferralResponse;
     await this.replaceSpecialistResponseWithPathwayResponse(request, response);
 
-    console.log(response);
+    this.logger.debug(response);
 
     return response;
   }
@@ -113,7 +114,7 @@ export class AppService {
     const bestTemplate = await this.templateSelectorService.selectBestTemplate(
       request.question,
     );
-    console.log('bestTemplate', bestTemplate);
+    this.logger.debug('bestTemplate', bestTemplate);
 
     if (bestTemplate) {
       return fs

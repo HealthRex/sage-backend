@@ -107,7 +107,7 @@ export class TemplateSelectorService {
           }),
         ),
     );
-    console.log('data', data);
+    this.logger.debug('data', data);
 
     return templateGoogleDocLinks[data.suggestedTemplate];
   }
