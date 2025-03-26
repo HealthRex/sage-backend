@@ -32,6 +32,7 @@
     "@nestjs/swagger": "^11.0.4",
     "ai": "^4.1.11",
     "class-transformer": "^0.5.1",
+    "class-validator": "^0.14.1",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1"
   },

@@ -1,4 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { MinAlphaNumLength } from '../validation/minAlphaNumLengthDecorator';
 
 export class ReferralRequest {
   @ApiProperty({
@@ -8,6 +9,10 @@ export class ReferralRequest {
       '37F with fatigue and trembling spells, found to have low T4 (3.1) but normal TSH (0.62). ' +
       'On multiple medications including stanozolol and digoxin. ' +
       'Would appreciate guidance on interpretation of thyroid function tests and recommended next steps in evaluation',
+  })
+  @MinAlphaNumLength(3, {
+    message:
+      'required "question" field must be a string of minimal alphanumeric length of 3',
   })
   question: string;
 
@@ -35,6 +40,10 @@ export class ReferralRequest {
       'LABORATORY AND OTHER PROCEDURES\n' +
       'The electrocardiogram revealed sinus tachycardia. An echocardiogram revealed mild prolapse of the mitral valve.' +
       'Cholesterol was 220 mg/dL.\n',
+  })
+  @MinAlphaNumLength(3, {
+    message:
+      'required "clinicalNotes" field must be a string of minimal alphanumeric length of 3',
   })
   clinicalNotes: string;
 }
