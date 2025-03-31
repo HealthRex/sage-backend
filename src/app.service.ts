@@ -9,6 +9,7 @@ import { ReferralResponse } from './models/referralResponse';
 import { TemplateSelectorService } from './template-selector/template-selector.service';
 import { PathwayService } from './pathway/pathway.service';
 import { SpecialistAIResponse } from './models/specialistAIResponse';
+import { Observable } from 'rxjs';
 
 enum AIProvider {
   Claude = 'CLAUDE',
@@ -41,6 +42,43 @@ export class AppService {
     request: ReferralRequest,
   ): Promise<ReferralResponse> {
     this.logger.debug('request: ', request);
+
+    const response = await this.queryLLM(request);
+    await this.replaceSpecialistResponseWithPathwayResponse(request, response);
+
+    this.logger.debug(response);
+
+    return response;
+  }
+
+  postReferralQuestionStreamed(
+    request: ReferralRequest,
+  ): Observable<{ data: ReferralResponse }> {
+    return new Observable((subscriber) => {
+      this.logger.debug('request: ', request);
+
+      this.queryLLM(request)
+        .then((response) => {
+          subscriber.next({ data: response });
+
+          this.replaceSpecialistResponseWithPathwayResponse(request, response)
+            .then(() => {
+              subscriber.next({ data: response });
+
+              this.logger.debug('response: ', response);
+              subscriber.complete();
+            })
+            .catch((reason) => {
+              subscriber.error(reason);
+            });
+        })
+        .catch((reason) => {
+          subscriber.error(reason);
+        });
+    });
+  }
+
+  private async queryLLM(request: ReferralRequest) {
     const systemPrompt = await this.selectSystemPrompt(request);
 
     // const referralTemplatesBase64: string = Buffer.from(
@@ -84,14 +122,7 @@ export class AppService {
       .replaceAll(/\n/g, '');
     this.logger.debug('supposedJsonResponse:', supposedJsonResponse);
 
-    const response: ReferralResponse = JSON.parse(
-      supposedJsonResponse,
-    ) as ReferralResponse;
-    await this.replaceSpecialistResponseWithPathwayResponse(request, response);
-
-    this.logger.debug(response);
-
-    return response;
+    return JSON.parse(supposedJsonResponse) as ReferralResponse;
   }
 
   private async replaceSpecialistResponseWithPathwayResponse(

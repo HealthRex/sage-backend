@@ -1,9 +1,10 @@
-import { Body, Controller, Get, Logger, Post } from '@nestjs/common';
+import { Body, Controller, Get, Logger, Post, Sse } from '@nestjs/common';
 import { AppService } from './app.service';
 
 import { ReferralRequest } from './models/referralRequest';
 import { ReferralResponse } from './models/referralResponse';
-import { ApiCreatedResponse } from '@nestjs/swagger';
+import { ApiCreatedResponse, ApiOkResponse } from '@nestjs/swagger';
+import { Observable } from 'rxjs';
 
 @Controller()
 export class AppController {
@@ -26,5 +27,19 @@ export class AppController {
   ): Promise<ReferralResponse> {
     this.logger.debug('controller request', request);
     return await this.appService.postReferralQuestion(request);
+  }
+
+  @Post('/referral-streamed')
+  @Sse()
+  @ApiOkResponse({
+    description:
+      'Successfully received streamed AI response to clinical question.',
+    type: ReferralResponse,
+  })
+  postReferralQuestionStreamed(
+    @Body() request: ReferralRequest,
+  ): Observable<{ data: ReferralResponse }> {
+    this.logger.debug('controller request', request);
+    return this.appService.postReferralQuestionStreamed(request);
   }
 }
