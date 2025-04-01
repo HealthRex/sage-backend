@@ -21,11 +21,3 @@ Generate JSON object with the following fields:
     * Free Thyroxine (Free T4): 2.1 ng/dL
     * Total T3: 210 ng/dL
   - If a lab value or patient information is not available, explicitly state “Not documented”.
-- Field: specialistAIResponse:
-  - Based on the patient information provided in the template and clinical question, produce a draft AI specialist response that answers each part of the PCP’s clinical question directly.
-  - Provide evidence-based recommendations in a clear, structured manner.
-  - Outline specific next steps for management feasible in the primary care setting
-  - Provide follow-up timing recommendations
-  - Specify which findings require specialist referral vs. PCP management
-  - List specific criteria for earlier follow-up if needed
-  - Respond with JSON object containing these 4 fields: summaryResponse, suggestedLabOrders, suggestedImaging and suggestedMedications.
