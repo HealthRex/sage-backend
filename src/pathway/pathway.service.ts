@@ -99,6 +99,7 @@ export class PathwayService {
             this.logger.error(
               'error querying Pathway API',
               error.response?.data,
+              request.messages,
             );
             // throw new Error('Error querying Pathway API');
             return caught;
