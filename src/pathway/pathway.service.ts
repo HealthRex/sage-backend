@@ -10,7 +10,8 @@ import { SpecialistAIResponse } from '../models/specialistAIResponse';
 
 const PathwayMinAlphaNumLength: number = 3;
 // TODO update this back to 1500 once Pathway fixes this bug
-const PathwayMaxAlphaNumLength: number = 1499;
+//      there's another bug where it doesn't accept 1499 alphanumeric chars - so, cutting this down to 1024
+const PathwayMaxAlphaNumLength: number = 1024;
 
 function splitIntoGivenAlphaNumCharLengths(
   str: string,
