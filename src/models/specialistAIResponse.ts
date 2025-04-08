@@ -1,4 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { z } from 'zod';
 
 export class SpecialistAIResponse {
   @ApiProperty({ description: 'Summary response' })
@@ -14,5 +15,13 @@ export class SpecialistAIResponse {
   suggestedMedications: string[];
 
   @ApiProperty({ description: 'Citations' })
-  citations: URL[];
+  citations: string[];
 }
+
+export const specialistAIResponseSchema = z.object({
+  summaryResponse: z.string(),
+  suggestedLabOrders: z.array(z.string()),
+  suggestedImaging: z.array(z.string()),
+  suggestedMedications: z.array(z.string()),
+  citations: z.array(z.string()),
+});

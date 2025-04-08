@@ -4,6 +4,7 @@ import { Message } from './message';
 export class Choice {
   index: number;
   message: Message;
+  delta: Message;
   @Expose({ name: 'finish_reason' })
   finishReason: string;
 }
@@ -23,7 +24,7 @@ export class AnswersResponse {
   chatCompletionString: string;
   created: Date;
   model: string;
-  citations: URL[];
+  citations: string[];
   choices: Choice[];
   usage: Usage;
 }

@@ -1,5 +1,12 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { generateText, LanguageModelV1 } from 'ai';
+import {
+  CoreMessage,
+  generateObject,
+  LanguageModelV1,
+  streamObject,
+  TextPart,
+  UserContent,
+} from 'ai';
 import { anthropic } from '@ai-sdk/anthropic';
 import { google } from '@ai-sdk/google';
 import { ReferralRequest } from './models/referralRequest';
@@ -10,6 +17,8 @@ import { TemplateSelectorService } from './template-selector/template-selector.s
 import { PathwayService } from './pathway/pathway.service';
 import { SpecialistAIResponse } from './models/specialistAIResponse';
 import { Observable } from 'rxjs';
+import { fromReadableStreamLike } from 'rxjs/internal/observable/innerFrom';
+import { LLMResponse, llmResponseSchema } from './models/llmResponse';
 
 enum AIProvider {
   Claude = 'CLAUDE',
@@ -43,12 +52,49 @@ export class AppService {
   ): Promise<ReferralResponse> {
     this.logger.debug('request: ', request);
 
-    const response = await this.queryLLM(request);
-    await this.replaceSpecialistResponseWithPathwayResponse(request, response);
+    const llmResponse = await this.queryLLM(request);
+    const pathwayResponse = await this.queryPathway(request, llmResponse);
+    const response: ReferralResponse = llmResponse as ReferralResponse;
+    response.specialistAIResponse = pathwayResponse;
 
     this.logger.debug(response);
 
     return response;
+  }
+
+  postReferralQuestionStreamed2(
+    request: ReferralRequest,
+  ): Observable<{ data: ReferralResponse }> {
+    return new Observable((subscriber) => {
+      this.logger.debug('request: ', request);
+
+      this.queryLLMStreamed(request)
+        .then((llmResponseStream) => {
+          let accumulatedResponse: ReferralResponse = new ReferralResponse();
+          llmResponseStream
+            .subscribe((next: ReferralResponse) => {
+              accumulatedResponse = next;
+              subscriber.next({ data: accumulatedResponse });
+            })
+            .add(() =>
+              this.queryPathwayStreamed(request, accumulatedResponse).subscribe(
+                (specialistAIResponse) => {
+                  accumulatedResponse.specialistAIResponse =
+                    specialistAIResponse;
+
+                  subscriber.next({ data: accumulatedResponse });
+
+                  this.logger.debug('response: ', accumulatedResponse);
+                  subscriber.complete();
+                },
+              ),
+            );
+        })
+
+        .catch((reason) => {
+          subscriber.error(reason);
+        });
+    });
   }
 
   postReferralQuestionStreamed(
@@ -57,28 +103,62 @@ export class AppService {
     return new Observable((subscriber) => {
       this.logger.debug('request: ', request);
 
-      this.queryLLM(request)
-        .then((response) => {
-          subscriber.next({ data: response });
-
-          this.replaceSpecialistResponseWithPathwayResponse(request, response)
-            .then(() => {
-              subscriber.next({ data: response });
-
-              this.logger.debug('response: ', response);
-              subscriber.complete();
+      this.queryLLMStreamed(request)
+        .then((llmResponseStream) => {
+          let accumulatedResponse: ReferralResponse = new ReferralResponse();
+          llmResponseStream
+            .subscribe((next: ReferralResponse) => {
+              accumulatedResponse = next;
+              subscriber.next({ data: accumulatedResponse });
             })
-            .catch((reason) => {
-              subscriber.error(reason);
+            .add(() => {
+              this.queryPathway(request, accumulatedResponse)
+                .then((specialistAIResponse) => {
+                  accumulatedResponse.specialistAIResponse =
+                    specialistAIResponse;
+
+                  subscriber.next({ data: accumulatedResponse });
+
+                  this.logger.debug('response: ', accumulatedResponse);
+                  subscriber.complete();
+                })
+                .catch((reason) => {
+                  subscriber.error(reason);
+                });
             });
         })
+
         .catch((reason) => {
           subscriber.error(reason);
         });
     });
   }
 
-  private async queryLLM(request: ReferralRequest) {
+  private async queryLLM(request: ReferralRequest): Promise<LLMResponse> {
+    const input = await this.prepareLLMInput(request);
+
+    const { object } = await generateObject(input);
+
+    this.logger.debug('structured response:', object);
+
+    return object as LLMResponse;
+  }
+
+  private async queryLLMStreamed(request: ReferralRequest) {
+    const input = await this.prepareLLMInput(request);
+
+    // @ts-expect-error("it is complaining that error has any type")
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+    (input as any).onError = ({ error }) => {
+      this.logger.error('error during streaming structured response:', error); // your error logging logic here
+    };
+
+    const { partialObjectStream } = streamObject(input);
+
+    return fromReadableStreamLike(partialObjectStream as ReadableStream);
+  }
+
+  private async prepareLLMInput(request: ReferralRequest) {
     const systemPrompt = await this.selectSystemPrompt(request);
 
     // const referralTemplatesBase64: string = Buffer.from(
@@ -87,6 +167,7 @@ export class AppService {
 
     const input = {
       model: this.selectModel(),
+      schema: llmResponseSchema,
       system: systemPrompt,
       messages: [
         {
@@ -95,50 +176,46 @@ export class AppService {
             {
               type: 'text',
               text: 'Clinical question: ' + request.question,
-            },
+            } as TextPart,
             {
               type: 'text',
               text: 'Patient notes: ' + request.clinicalNotes,
-            },
+            } as TextPart,
             // {
             //   type: 'file',
             //   data: referralTemplatesBase64,
             //   mimeType: referralTemplateFileMimeType,
             // },
-          ],
-        },
+          ] as UserContent,
+        } as CoreMessage,
       ],
     };
 
     // this.logger.debug('referralTemplatesBase64: ', referralTemplatesBase64);
     this.logger.debug('input: ', input);
-
-    // @ts-expect-error('input type is not recognized even though it matches to required type')
-    const { text } = await generateText(input);
-    this.logger.debug(text);
-
-    const supposedJsonResponse: string = text
-      .substring(text.indexOf('{'), text.lastIndexOf('}') + 1)
-      .replaceAll(/\n/g, '');
-    this.logger.debug('supposedJsonResponse:', supposedJsonResponse);
-
-    return JSON.parse(supposedJsonResponse) as ReferralResponse;
+    return input;
   }
 
-  private async replaceSpecialistResponseWithPathwayResponse(
+  private async queryPathway(
     request: ReferralRequest,
-    response: ReferralResponse,
-  ) {
-    const pathwayResponse: SpecialistAIResponse =
-      await this.pathwayService.retrieveAnswer(
-        request.question,
-        request.clinicalNotes,
-        response.populatedTemplate,
-      );
+    response: LLMResponse,
+  ): Promise<SpecialistAIResponse> {
+    return await this.pathwayService.retrieveAnswer(
+      request.question,
+      request.clinicalNotes,
+      response.populatedTemplate,
+    );
+  }
 
-    if (pathwayResponse) {
-      response.specialistAIResponse = pathwayResponse;
-    }
+  private queryPathwayStreamed(
+    request: ReferralRequest,
+    response: LLMResponse,
+  ): Observable<SpecialistAIResponse> {
+    return this.pathwayService.retrieveAnswerStreamed(
+      request.question,
+      request.clinicalNotes,
+      response.populatedTemplate,
+    );
   }
 
   private async selectSystemPrompt(request: ReferralRequest) {

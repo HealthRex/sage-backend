@@ -13,7 +13,7 @@ Generate JSON object with the following fields:
   - First, examine ONLY the templates in the following Stanford document: {{TemplateGoogleDocLink}}
   - Mention ALL available templates in the above document and use step-by-step logic to justify the most appropriate selection.
 - Field: populatedTemplate (STRICT FORMAT AND TEMPLATE ADHERENCE AND LAB VALUE INCLUSION REQUIRED):
-  - Respond with JSON array and put each filled template field into its own JSON object as an item of enclosing array.
+  - Respond with JSON array and put each filled template field into its own JSON object, e.g., {"field": "filled template field name", "value": "filled template field value"} as an item of enclosing array.
   - Maintain original order of sections and questions without modifications.
   - Populate each field with case-specific information.
   - For lab results, explicitly list numeric values instead of checkboxes. Example:
