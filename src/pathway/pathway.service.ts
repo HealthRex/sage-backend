@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
-import { catchError, lastValueFrom, map, Observable } from 'rxjs';
+import { catchError, lastValueFrom, map, Observable, throwError } from 'rxjs';
 import { plainToInstance } from 'class-transformer';
 import { AxiosError } from 'axios';
 import { AnswersRequest } from './models/answersRequest';
@@ -95,15 +95,16 @@ export class PathwayService {
           }),
         )
         .pipe(
-          catchError((error: AxiosError, caught) => {
+          catchError((error: AxiosError) => {
             // in case of an error just return the empty response
             this.logger.error(
               'error querying Pathway API',
               error.response?.data,
               request.messages,
             );
-            // throw new Error('Error querying Pathway API');
-            return caught;
+            return throwError(
+              () => new Error('Error querying Pathway API: ' + error.message),
+            );
           }),
         ),
     );
