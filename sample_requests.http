@@ -25,6 +25,15 @@ Content-Type: application/json
   "clinicalNotes": "SUBJECTIVE: 68yo M returns for follow-up of anemia. First noted 3 months ago. Denies any visible blood in stool or melena. Reports occasional epigastric discomfort, worse with spicy foods, better with OTC antacids. No NSAID use. No weight loss, night sweats, or fatigue. Last colonoscopy 8 years ago was normal. No family history of GI malignancy. \n\n  OBJECTIVE:\n  Vitals: BP 132/78, HR 88, Weight stable at 78kg\n  CBC: Hgb 9.8 g/dL (was 10.2 g/dL 3 months ago, 13.8 g/dL 1 year ago)\n  MCV 76 fL (80-100)\n  WBC 7.2, Platelets 245\n  Iron studies: Ferritin 15 ng/mL (30-400), Transferrin saturation 8% (15-50%)\n  TIBC 410 mcg/dL (250-370)\n  Reticulocyte count 1.1%\n  Fecal occult blood testing: Negative x3\n\n  ASSESSMENT/PLAN: Microcytic anemia, likely iron deficiency. Consider GI workup vs empiric iron supplementation. Will discuss with patient."
 }
 
+### Clinical question without matched template streamed
+POST http://localhost:3000/referral-streamed
+Content-Type: application/json
+
+{
+  "question": "I have a 68-year-old male with persistent microcytic anemia. Hgb 9.8 g/dL, MCV 76. Iron studies show low ferritin (15 ng/mL) despite no evidence of overt bleeding. He has intermittent epigastric pain. Is endoscopic evaluation indicated before iron supplementation or can we start iron and monitor response?",
+  "clinicalNotes": "SUBJECTIVE: 68yo M returns for follow-up of anemia. First noted 3 months ago. Denies any visible blood in stool or melena. Reports occasional epigastric discomfort, worse with spicy foods, better with OTC antacids. No NSAID use. No weight loss, night sweats, or fatigue. Last colonoscopy 8 years ago was normal. No family history of GI malignancy. \n\n  OBJECTIVE:\n  Vitals: BP 132/78, HR 88, Weight stable at 78kg\n  CBC: Hgb 9.8 g/dL (was 10.2 g/dL 3 months ago, 13.8 g/dL 1 year ago)\n  MCV 76 fL (80-100)\n  WBC 7.2, Platelets 245\n  Iron studies: Ferritin 15 ng/mL (30-400), Transferrin saturation 8% (15-50%)\n  TIBC 410 mcg/dL (250-370)\n  Reticulocyte count 1.1%\n  Fecal occult blood testing: Negative x3\n\n  ASSESSMENT/PLAN: Microcytic anemia, likely iron deficiency. Consider GI workup vs empiric iron supplementation. Will discuss with patient."
+}
+
 ### Remote clinical question with matched template
 POST https://assist-pc-backend.onrender.com/referral
 Content-Type: application/json

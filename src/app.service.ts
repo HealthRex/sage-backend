@@ -123,12 +123,16 @@ export class AppService {
                   subscriber.complete();
                 })
                 .catch((reason) => {
+                  this.logger.error(
+                    'error occurred trying to query Pathway: ',
+                    reason,
+                  );
                   subscriber.error(reason);
                 });
             });
         })
-
         .catch((reason) => {
+          this.logger.error('error occurred trying to query LLM: ', reason);
           subscriber.error(reason);
         });
     });
