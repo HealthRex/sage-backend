@@ -62,9 +62,10 @@ export class AppService {
     return response;
   }
 
-  postReferralQuestionStreamed2(
+  postReferralQuestionStreamed(
     request: ReferralRequest,
   ): Observable<{ data: ReferralResponse }> {
+    // TODO rewrite to be more flat by making inner subscription function async like "async (subscriber) => {}"
     return new Observable((subscriber) => {
       this.logger.debug('request: ', request);
 
@@ -77,62 +78,22 @@ export class AppService {
               subscriber.next({ data: accumulatedResponse });
             })
             .add(() =>
-              this.queryPathwayStreamed(request, accumulatedResponse).subscribe(
-                (specialistAIResponse) => {
+              this.queryPathwayStreamed(request, accumulatedResponse)
+                .subscribe((specialistAIResponse) => {
                   accumulatedResponse.specialistAIResponse =
                     specialistAIResponse;
 
                   subscriber.next({ data: accumulatedResponse });
 
                   this.logger.debug('response: ', accumulatedResponse);
+                })
+                .add(() => {
                   subscriber.complete();
-                },
-              ),
+                }),
             );
         })
-
         .catch((reason) => {
-          subscriber.error(reason);
-        });
-    });
-  }
-
-  postReferralQuestionStreamed(
-    request: ReferralRequest,
-  ): Observable<{ data: ReferralResponse }> {
-    return new Observable((subscriber) => {
-      this.logger.debug('request: ', request);
-
-      this.queryLLMStreamed(request)
-        .then((llmResponseStream) => {
-          let accumulatedResponse: ReferralResponse = new ReferralResponse();
-          llmResponseStream
-            .subscribe((next: ReferralResponse) => {
-              accumulatedResponse = next;
-              subscriber.next({ data: accumulatedResponse });
-            })
-            .add(() => {
-              this.queryPathway(request, accumulatedResponse)
-                .then((specialistAIResponse) => {
-                  accumulatedResponse.specialistAIResponse =
-                    specialistAIResponse;
-
-                  subscriber.next({ data: accumulatedResponse });
-
-                  this.logger.debug('response: ', accumulatedResponse);
-                  subscriber.complete();
-                })
-                .catch((reason) => {
-                  this.logger.error(
-                    'error occurred trying to query Pathway: ',
-                    reason,
-                  );
-                  subscriber.error(reason);
-                });
-            });
-        })
-        .catch((reason) => {
-          this.logger.error('error occurred trying to query LLM: ', reason);
+          this.logger.error('error querying LLM: ', reason);
           subscriber.error(reason);
         });
     });
