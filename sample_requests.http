@@ -1,3 +1,12 @@
+### Pathway chatbot question
+POST http://localhost:3000/ask-pathway
+Content-Type: application/json
+
+[
+  "37F with fatigue and trembling spells, found to have low T4 (3.1) but normal TSH (0.62). On multiple medications including stanozolol and digoxin. Would appreciate guidance on interpretation of thyroid function tests and recommended next steps in evaluation",
+  "HISTORY OF PRESENT ILLNESS\nA 37-year-old white female is referred by her family physician for thyroid evaluation.\nShe has complained of trembling spells associated with feeling hot and flushed for 3 months.\nShe has noted tiredness and lack of energy for 4 months.\nHer weight has been stable during this time.\nChronic constipation has been worse recently.\nPAST MEDICAL HISTORY\nThere is no history of a goiter.\nShe has a history of chronic constipation.\nPast medical history indicates a previous hysterectomy and cholecystectomy 11 years ago,\nhereditary angioedema and a recent history of hypercholesterolemia.\nMEDICATIONS\nHer medications include 400 mg ibuprofen 3 times daily, 0.25 mg digoxin daily,\nstool softener twice daily and 2 mg stanozolol daily for angioedema.\nFAMILY HISTORY\nThere is no family history of thyroid disease.\nPHYSICAL EXAMINATION\nPhysical examination shows an obese white female who is 160 cm tall and weighs 87.7 kg.\nBlood pressure is 148/90 mmHg.\nPulse is 84/min and regular.\nShe has increased hair on her face, abdomen, arms and lower back.\nThe remainder of the physical examination is normal.\nShe does not have a goiter and her deep tendon reflexes are normal.\nLABORATORY AND OTHER PROCEDURES\nLaboratory results recently obtained by her physician included the following:\nCBC showed HCT 39%; WBC 6700/mm3 with a normal differential.\nUrinalysis showed a specific gravity of 1.005, pH 6.0, negative for glucose, protein and blood.\nChemistry profile results were as follows: Albumin 4.3 g/dL; globulins 2.4 g/dL, Ca 9.3 mg/dL; Phosphate 3.2 mmHg;\nbilirubin 0.3 mg/dL; alkaline phosphatase 90 IU/L; SGOT 33 U/L; SGPT 52 U/L; Na 143 mEq/L; K 3.9 mEq/L;\nCl 107 mEq/L;C02 24 mEq/L; BUN 12 mg/dL; Creatinine 1.0 mg/dL; Cholesterol 187 mg/dL;\n  triglycerides 312 mg/dL and glucose 117 mg/dL.\nSerum thyroxine-↓3.1 μg/dL, T3 uptake-↑56%, free thyroxine index-1.7, serum triiodothyronine- 67 ng/dL, TSH 0.62 μIU/mL."
+]
+
 ### Clinical question with matched template streamed
 POST http://localhost:3000/referral-streamed
 Content-Type: application/json

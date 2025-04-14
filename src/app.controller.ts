@@ -42,4 +42,14 @@ export class AppController {
     this.logger.debug('controller request', request);
     return this.appService.postReferralQuestionStreamed(request);
   }
+
+  @Post('/ask-pathway')
+  @ApiCreatedResponse({
+    description:
+      'Successfully received Pathway AI response to a clarifying question.',
+  })
+  async postPathwayQuestion(@Body() request: string[]): Promise<string> {
+    this.logger.debug('controller request', request);
+    return await this.appService.postPathwayQuestion(request);
+  }
 }

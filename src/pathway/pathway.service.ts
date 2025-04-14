@@ -74,42 +74,8 @@ export class PathwayService {
       clinicalNotes,
       filledTemplate,
     );
-    this.logger.debug('Pathway API request: ', request);
 
-    const { data } = await lastValueFrom(
-      this.httpService
-        .post<AnswersResponse, AnswersRequest>(
-          String(process.env.PATHWAY_API),
-          request,
-          {
-            headers: {
-              Authorization: 'Bearer ' + process.env.PATHWAY_AI_API_KEY,
-            },
-            // responseType: 'stream'
-          },
-        )
-        .pipe(
-          // looks like we need to manually map the data to the type we want via class-transform
-          map((response) => {
-            response.data = plainToInstance(AnswersResponse, response.data);
-            return response;
-          }),
-        )
-        .pipe(
-          catchError((error: AxiosError) => {
-            // in case of an error just return the empty response
-            this.logger.error(
-              'error querying Pathway API',
-              error.response?.data,
-              request.messages,
-            );
-            return throwError(
-              () => new Error('Error querying Pathway API: ' + error.message),
-            );
-          }),
-        ),
-    );
-    this.logger.debug('data', data);
+    const data = await this.doSyncRequest(request);
 
     const specialistResponse: SpecialistAIResponse = new SpecialistAIResponse();
     let specialistResponseStr: string = '';
@@ -133,7 +99,6 @@ export class PathwayService {
       filledTemplate,
       true,
     );
-    this.logger.debug('Pathway API request: ', request);
 
     return new Observable<SpecialistAIResponse>((subscriber) => {
       const accumulatedResponse: SpecialistAIResponse =
@@ -204,12 +169,82 @@ export class PathwayService {
     });
   }
 
+  // TODO try to merge with retrieveAnswer(Streamed?)
+  async retrieveChatAnswer(previousMessages: string[]): Promise<string> {
+    // TODO should previousMessages contain information about whether the message was from 'user' or 'assistant'?
+    //      Will Pathway accept messages from 'assistant' as context?
+    const request: AnswersRequest = new AnswersRequest([
+      new Message('user', 'Respond with a single sentence.'),
+    ]);
+
+    for (const previousMessage of previousMessages) {
+      const previousMessageSplit = splitIntoGivenAlphaNumCharLengths(
+        previousMessage,
+        PathwayMinAlphaNumLength,
+        PathwayMaxAlphaNumLength,
+      );
+      for (const previousMessageSlice of previousMessageSplit) {
+        request.messages.push(new Message('user', previousMessageSlice));
+      }
+    }
+    this.logger.debug('Pathway API request: ', request);
+    const data = await this.doSyncRequest(request);
+
+    let chatResponse: string = '';
+    for (const choice of data.choices) {
+      chatResponse += choice.message.content;
+    }
+    const chatResponseSplit = chatResponse.split('\n\n', 1);
+    if (chatResponseSplit.length > 0) {
+      return chatResponseSplit[0];
+    }
+
+    return chatResponse;
+  }
+
+  private async doSyncRequest(request: AnswersRequest) {
+    const { data } = await lastValueFrom(
+      this.httpService
+        .post<AnswersResponse, AnswersRequest>(
+          String(process.env.PATHWAY_API),
+          request,
+          {
+            headers: {
+              Authorization: 'Bearer ' + process.env.PATHWAY_AI_API_KEY,
+            },
+          },
+        )
+        .pipe(
+          // looks like we need to manually map the data to the type we want via class-transform
+          map((response) => {
+            response.data = plainToInstance(AnswersResponse, response.data);
+            return response;
+          }),
+        )
+        .pipe(
+          catchError((error: AxiosError) => {
+            // in case of an error just return the empty response
+            this.logger.error(
+              'error querying Pathway API',
+              error.response?.data,
+              request.messages,
+            );
+            return throwError(
+              () => new Error('Error querying Pathway API: ' + error.message),
+            );
+          }),
+        ),
+    );
+    this.logger.debug('data', data);
+    return data;
+  }
+
   private prepareRequest(
     clinicalQuestion: string,
     clinicalNotes: string,
     filledTemplate: object,
     shouldStream: boolean = false,
-  ) {
+  ): AnswersRequest {
     const request: AnswersRequest = new AnswersRequest([], shouldStream);
 
     const clinicalQuestionSplit = splitIntoGivenAlphaNumCharLengths(
@@ -240,6 +275,7 @@ export class PathwayService {
       request.messages.push(new Message('user', filledTemplateSlice));
     }
 
+    this.logger.debug('Pathway API request: ', request);
     return request;
   }
 }

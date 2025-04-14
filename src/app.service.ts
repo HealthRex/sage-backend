@@ -212,4 +212,8 @@ export class AppService {
         throw new Error('unknown AI_PROVIDER type selected');
     }
   }
+
+  async postPathwayQuestion(request: string[]): Promise<string> {
+    return this.pathwayService.retrieveChatAnswer(request);
+  }
 }
