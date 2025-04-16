@@ -36,11 +36,11 @@ export class AppController {
       'Successfully received streamed AI response to clinical question.',
     type: ReferralResponse,
   })
-  postReferralQuestionStreamed(
+  async postReferralQuestionStreamed(
     @Body() request: ReferralRequest,
-  ): Observable<{ data: ReferralResponse }> {
+  ): Promise<Observable<{ data: ReferralResponse }>> {
     this.logger.debug('controller request', request);
-    return this.appService.postReferralQuestionStreamed(request);
+    return await this.appService.postReferralQuestionStreamed(request);
   }
 
   @Post('/ask-pathway')
