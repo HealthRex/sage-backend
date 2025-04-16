@@ -194,10 +194,6 @@ export class PathwayService {
     for (const choice of data.choices) {
       chatResponse += choice.message.content;
     }
-    const chatResponseSplit = chatResponse.split('\n\n', 1);
-    if (chatResponseSplit.length > 0) {
-      return chatResponseSplit[0];
-    }
 
     return chatResponse;
   }
