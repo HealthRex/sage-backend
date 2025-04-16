@@ -68,7 +68,6 @@ export class AppService {
     const llmResponseObservable: Observable<ReferralResponse> =
       await this.queryLLMStreamed(request);
 
-    // TODO rewrite to be more flat by making inner subscription function async like "async (subscriber) => {}"
     return new Observable((subscriber) => {
       this.logger.debug('request: ', request);
 
