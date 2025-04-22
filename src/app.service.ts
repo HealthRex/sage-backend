@@ -106,10 +106,8 @@ export class AppService {
   postPathwayQuestionStreamed(
     request: string[],
   ): Observable<{ data: SpecialistAIResponse }> {
-    // TODO not working yet - returning only last value and as an object - fix and push
     return this.pathwayService.retrieveChatAnswerStreamed(request).pipe(
       map((next) => {
-        this.logger.debug('outside observable next: ', next);
         return { data: next };
       }),
     );

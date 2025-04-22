@@ -58,7 +58,8 @@ export class AppController {
   }
 
   @Post('/ask-pathway-streamed')
-  @ApiCreatedResponse({
+  @Sse()
+  @ApiOkResponse({
     description:
       'Successfully received streamed Pathway AI response to a clarifying question.',
     type: SpecialistAIResponse,
