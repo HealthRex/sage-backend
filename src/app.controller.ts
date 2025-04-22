@@ -5,6 +5,7 @@ import { ReferralRequest } from './models/referralRequest';
 import { ReferralResponse } from './models/referralResponse';
 import { ApiCreatedResponse, ApiOkResponse } from '@nestjs/swagger';
 import { Observable } from 'rxjs';
+import { SpecialistAIResponse } from './models/specialistAIResponse';
 
 @Controller()
 export class AppController {
@@ -47,9 +48,25 @@ export class AppController {
   @ApiCreatedResponse({
     description:
       'Successfully received Pathway AI response to a clarifying question.',
+    type: SpecialistAIResponse,
   })
-  async postPathwayQuestion(@Body() request: string[]): Promise<string> {
+  async postPathwayQuestion(
+    @Body() request: string[],
+  ): Promise<SpecialistAIResponse> {
     this.logger.debug('controller request', request);
     return await this.appService.postPathwayQuestion(request);
+  }
+
+  @Post('/ask-pathway-streamed')
+  @ApiCreatedResponse({
+    description:
+      'Successfully received streamed Pathway AI response to a clarifying question.',
+    type: SpecialistAIResponse,
+  })
+  postPathwayQuestionStreamed(
+    @Body() request: string[],
+  ): Observable<{ data: SpecialistAIResponse }> {
+    this.logger.debug('controller request', request);
+    return this.appService.postPathwayQuestionStreamed(request);
   }
 }

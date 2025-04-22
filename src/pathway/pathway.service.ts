@@ -76,21 +76,7 @@ export class PathwayService {
     );
 
     const data = await this.doSyncRequest(request);
-
-    const specialistResponse: SpecialistAIResponse = new SpecialistAIResponse();
-    let specialistResponseStr: string = '';
-    for (const choice of data.choices) {
-      specialistResponseStr += choice.message.content;
-    }
-    specialistResponse.summaryResponse = specialistResponseStr;
-    specialistResponse.citations = [];
-    for (let i = 0; i < data.citationsDetailed.length; i++) {
-      specialistResponse.citations.push(
-        new Citation(data.citationsDetailed[i].name, data.citations[i]),
-      );
-    }
-
-    return specialistResponse;
+    return this.specialistResponseFrom(data);
   }
 
   retrieveAnswerStreamed(
@@ -104,7 +90,37 @@ export class PathwayService {
       filledTemplate,
       true,
     );
+    return this.doAsyncRequest(request);
+  }
 
+  // TODO try to merge with retrieveAnswer
+  async retrieveChatAnswer(
+    previousMessages: string[],
+  ): Promise<SpecialistAIResponse> {
+    // TODO should previousMessages contain information about whether the message was from 'user' or 'assistant'?
+    //      Will Pathway accept messages from 'assistant' as context?
+    const request = this.answersRequestFromPreviousMessages(previousMessages);
+    const data = await this.doSyncRequest(request);
+
+    return this.specialistResponseFrom(data);
+  }
+
+  // TODO try to merge with retrieveAnswerStreamed
+  retrieveChatAnswerStreamed(
+    previousMessages: string[],
+  ): Observable<SpecialistAIResponse> {
+    // TODO should previousMessages contain information about whether the message was from 'user' or 'assistant'?
+    //      Will Pathway accept messages from 'assistant' as context?
+    const request = this.answersRequestFromPreviousMessages(
+      previousMessages,
+      true, // shouldStream
+    );
+    return this.doAsyncRequest(request);
+  }
+
+  private doAsyncRequest(
+    request: AnswersRequest,
+  ): Observable<SpecialistAIResponse> {
     return new Observable<SpecialistAIResponse>((subscriber) => {
       const accumulatedResponse: SpecialistAIResponse =
         new SpecialistAIResponse();
@@ -189,13 +205,11 @@ export class PathwayService {
     });
   }
 
-  // TODO try to merge with retrieveAnswer(Streamed?)
-  async retrieveChatAnswer(previousMessages: string[]): Promise<string> {
-    // TODO should previousMessages contain information about whether the message was from 'user' or 'assistant'?
-    //      Will Pathway accept messages from 'assistant' as context?
-    const request: AnswersRequest = new AnswersRequest([
-      new Message('user', 'Respond with a single sentence.'),
-    ]);
+  private answersRequestFromPreviousMessages(
+    previousMessages: string[],
+    shouldStream: boolean = false,
+  ) {
+    const request: AnswersRequest = new AnswersRequest([], shouldStream);
 
     for (const previousMessage of previousMessages) {
       const previousMessageSplit = splitIntoGivenAlphaNumCharLengths(
@@ -208,14 +222,7 @@ export class PathwayService {
       }
     }
     this.logger.debug('Pathway API request: ', request);
-    const data = await this.doSyncRequest(request);
-
-    let chatResponse: string = '';
-    for (const choice of data.choices) {
-      chatResponse += choice.message.content;
-    }
-
-    return chatResponse;
+    return request;
   }
 
   private async doSyncRequest(request: AnswersRequest) {
@@ -253,6 +260,22 @@ export class PathwayService {
     );
     this.logger.debug('data', data);
     return data;
+  }
+
+  private specialistResponseFrom(data: AnswersResponse): SpecialistAIResponse {
+    const specialistResponse: SpecialistAIResponse = new SpecialistAIResponse();
+    let specialistResponseStr: string = '';
+    for (const choice of data.choices) {
+      specialistResponseStr += choice.message.content;
+    }
+    specialistResponse.summaryResponse = specialistResponseStr;
+    specialistResponse.citations = [];
+    for (let i = 0; i < data.citationsDetailed.length; i++) {
+      specialistResponse.citations.push(
+        new Citation(data.citationsDetailed[i].name, data.citations[i]),
+      );
+    }
+    return specialistResponse;
   }
 
   private prepareRequest(

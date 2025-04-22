@@ -99,6 +99,22 @@ export class AppService {
     });
   }
 
+  async postPathwayQuestion(request: string[]): Promise<SpecialistAIResponse> {
+    return this.pathwayService.retrieveChatAnswer(request);
+  }
+
+  postPathwayQuestionStreamed(
+    request: string[],
+  ): Observable<{ data: SpecialistAIResponse }> {
+    // TODO not working yet - returning only last value and as an object - fix and push
+    return this.pathwayService.retrieveChatAnswerStreamed(request).pipe(
+      map((next) => {
+        this.logger.debug('outside observable next: ', next);
+        return { data: next };
+      }),
+    );
+  }
+
   private async queryLLM(request: ReferralRequest): Promise<LLMResponse> {
     const input = await this.prepareLLMInput(request);
 
@@ -213,9 +229,5 @@ export class AppService {
       default:
         throw new Error('unknown AI_PROVIDER type selected');
     }
-  }
-
-  async postPathwayQuestion(request: string[]): Promise<string> {
-    return this.pathwayService.retrieveChatAnswer(request);
   }
 }
