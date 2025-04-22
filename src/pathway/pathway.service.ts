@@ -6,7 +6,7 @@ import { AxiosError } from 'axios';
 import { AnswersRequest } from './models/answersRequest';
 import { Message } from './models/message';
 import { AnswersResponse } from './models/answersResponse';
-import { SpecialistAIResponse } from '../models/specialistAIResponse';
+import { Citation, SpecialistAIResponse } from '../models/specialistAIResponse';
 import EventSourceStream from '@server-sent-stream/web';
 
 const PathwayMinAlphaNumLength: number = 3;
@@ -83,7 +83,12 @@ export class PathwayService {
       specialistResponseStr += choice.message.content;
     }
     specialistResponse.summaryResponse = specialistResponseStr;
-    specialistResponse.citations = data.citations;
+    specialistResponse.citations = [];
+    for (let i = 0; i < data.citationsDetailed.length; i++) {
+      specialistResponse.citations.push(
+        new Citation(data.citationsDetailed[i].name, data.citations[i]),
+      );
+    }
 
     return specialistResponse;
   }
@@ -151,9 +156,24 @@ export class PathwayService {
             if (receivedNewData) {
               accumulatedResponse.summaryResponse += specialistResponseStr;
             }
-            if (parsedResponse.citations && parsedResponse.citations.length) {
+            if (
+              parsedResponse.citationsDetailed &&
+              parsedResponse.citationsDetailed.length >
+                accumulatedResponse.citations.length
+            ) {
               receivedNewData = true;
-              accumulatedResponse.citations.push(...parsedResponse.citations);
+              for (
+                let i = accumulatedResponse.citations.length;
+                i < parsedResponse.citationsDetailed.length;
+                i++
+              ) {
+                accumulatedResponse.citations.push(
+                  new Citation(
+                    parsedResponse.citationsDetailed[i].name,
+                    parsedResponse.citations[i],
+                  ),
+                );
+              }
             }
 
             if (receivedNewData) {
