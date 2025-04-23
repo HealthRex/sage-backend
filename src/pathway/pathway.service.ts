@@ -314,16 +314,6 @@ export class PathwayService {
       request.messages.push(new Message('user', filledTemplateSlice));
     }
 
-    request.messages.push(
-      new Message(
-        'user',
-        'Instructions:\n' +
-          '1. Provide an assessment in a section titled "Assessment".\n' +
-          '2. Provide specific recommendations along with the rationale in a section titled "Recommendations and Rationale".\n' +
-          '3. Provide a contingency plan in a section titled "Contingency Plan".',
-      ),
-    );
-
     this.logger.debug('Pathway API request: ', request);
     return request;
   }
