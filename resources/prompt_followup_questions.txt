@@ -1,0 +1,18 @@
+Given a specialist-level clinical question and the corresponding LLM-generated specialist response,
+generate a list of 3 high-quality follow-up questions that a primary care physician (or referring provider)
+should consider asking the specialist.
+These follow-up questions should be a list of high-yield follow-up questions
+that a generalist clinician could ask the specialist in a referral or e-consult.
+These follow-up questions should:
+- clarify key uncertainties or next steps in the diagnostic or management plan
+- anticipate potential patient-specific concerns or complications
+- surface clinical thresholds: What triggers (e.g., lab values, red flags, time course) would change the specialist’s diagnosis or management
+You are writing these for a busy generalist clinician who may not have specialty expertise.
+The goal is to empower thoughtful, proactive collaboration with a specialist and ensure critical issues are not missed.
+Guidelines:
+- questions should be concise one-liners and clinically specific
+- avoid long, verbose questions or generic advice
+- do not repeat information already clearly addressed in the original specialist response
+Format:
+Output exactly 3 follow-up questions.
+No additional commentary or explanation is needed.

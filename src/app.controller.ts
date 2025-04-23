@@ -14,8 +14,8 @@ export class AppController {
   constructor(private readonly appService: AppService) {}
 
   @Get()
-  getHello(): string {
-    return this.appService.getHello();
+  getRoot(): string {
+    return this.appService.getRoot();
   }
 
   @Post('/referral')
@@ -69,5 +69,16 @@ export class AppController {
   ): Observable<{ data: SpecialistAIResponse }> {
     this.logger.debug('controller request', request);
     return this.appService.postPathwayQuestionStreamed(request);
+  }
+
+  @Post('/followup-questions')
+  @ApiCreatedResponse({
+    description: 'Successfully generated followup questions from LLM.',
+    type: 'string',
+    isArray: true,
+  })
+  generateFollowupQuestions(@Body() request: string[]): Promise<string[]> {
+    this.logger.debug('controller request', request);
+    return this.appService.generateFollowupQuestions(request);
   }
 }

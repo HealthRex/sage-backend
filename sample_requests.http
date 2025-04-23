@@ -1,3 +1,12 @@
+### Gemini followup questions
+POST http://localhost:3000/followup-questions
+Content-Type: application/json
+
+[
+  "Clinical question: 42F with history of SLE and proteinuria. Nephrology consult recommends mycophenolate + ACEi.",
+  "LLM-generated specialist response: Recommend mycophenolate mofetil 1g BID and continue lisinopril. Monitor renal function and proteinuria monthly. Consider biopsy if creatinine worsens or proteinuria increases despite treatment."
+]
+
 ### Pathway chatbot question
 POST http://localhost:3000/ask-pathway
 Content-Type: application/json
