@@ -18,7 +18,7 @@ import { ReferralResponse } from './models/referralResponse';
 import { TemplateSelectorService } from './template-selector/template-selector.service';
 import { PathwayService } from './pathway/pathway.service';
 import { SpecialistAIResponse } from './models/specialistAIResponse';
-import { concatWith, map, Observable, tap } from 'rxjs';
+import { map, Observable } from 'rxjs';
 import { fromReadableStreamLike } from 'rxjs/internal/observable/innerFrom';
 import { LLMResponse, llmResponseSchema } from './models/llmResponse';
 import { z } from 'zod';
@@ -89,30 +89,35 @@ export class AppService {
 
     return new Observable((subscriber) => {
       let accumulatedResponse: ReferralResponse = new ReferralResponse();
-      llmResponseObservable
-        .pipe(
-          tap((next) => {
-            accumulatedResponse = next;
-          }),
-          concatWith(
-            this.queryPathwayStreamed(request, accumulatedResponse).pipe(
+      llmResponseObservable.subscribe({
+        next: (next: ReferralResponse) => {
+          accumulatedResponse = next;
+          subscriber.next({ data: next });
+        },
+        error: (reason) => {
+          this.logger.error('error querying LLM: ', reason);
+          subscriber.error(reason);
+        },
+        complete: () => {
+          this.queryPathwayStreamed(request, accumulatedResponse)
+            .pipe(
               map((specialistAIResponse: SpecialistAIResponse) => {
                 accumulatedResponse.specialistAIResponse = specialistAIResponse;
                 return accumulatedResponse;
               }),
-            ),
-          ),
-        )
-        .subscribe({
-          next: (next: ReferralResponse) => {
-            subscriber.next({ data: next });
-          },
-          complete: () => subscriber.complete(),
-          error: (reason) => {
-            this.logger.error('error querying LLM: ', reason);
-            subscriber.error(reason);
-          },
-        });
+            )
+            .subscribe({
+              next: (next: ReferralResponse) => {
+                subscriber.next({ data: next });
+              },
+              complete: () => subscriber.complete(),
+              error: (reason) => {
+                this.logger.error('error querying LLM: ', reason);
+                subscriber.error(reason);
+              },
+            });
+        },
+      });
     });
   }
 

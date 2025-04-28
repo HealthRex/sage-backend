@@ -9,55 +9,6 @@ import { AnswersResponse } from './models/answersResponse';
 import { Citation, SpecialistAIResponse } from '../models/specialistAIResponse';
 import EventSourceStream from '@server-sent-stream/web';
 
-const PathwayMinAlphaNumLength: number = 3;
-// TODO update this back to 1500 once Pathway fixes this bug
-//      there's another bug where it doesn't accept 1499 alphanumeric chars - so, cutting this down to 1024
-const PathwayMaxAlphaNumLength: number = 1024;
-
-function splitIntoGivenAlphaNumCharLengths(
-  str: string,
-  minAlphaNumLength: number,
-  maxAlphaNumLength: number,
-): string[] {
-  const result: string[] = [];
-  if (str == null || str.length === 0) return result;
-
-  const alphaNumericCharRegex = /[a-zA-Z0-9]/g;
-
-  const alphaNumericCharMatches = str.matchAll(alphaNumericCharRegex);
-  let i = 0;
-  let startIdx = 0;
-  for (const alphaNumericCharMatch of alphaNumericCharMatches) {
-    if (i > 0 && i % maxAlphaNumLength === 0) {
-      result.push(str.slice(startIdx, alphaNumericCharMatch.index));
-      startIdx = alphaNumericCharMatch.index;
-    }
-    i++;
-  }
-  if (i % maxAlphaNumLength < minAlphaNumLength) {
-    const lastChunk = result.pop();
-    if (lastChunk === undefined) {
-      // given string is too short in alphanumeric characters - return empty array
-      return result;
-    } else {
-      // need to rejoin last pushed chunk with remaining chunk and re-split it
-      const reJoinedChunk = lastChunk + str.slice(startIdx);
-      const lastTwoSlices = splitIntoGivenAlphaNumCharLengths(
-        reJoinedChunk,
-        minAlphaNumLength,
-        Math.ceil((maxAlphaNumLength + (i % maxAlphaNumLength)) / 2),
-      );
-      result.push(...lastTwoSlices);
-    }
-  } else {
-    if (startIdx < str.length) {
-      result.push(str.slice(startIdx));
-    }
-  }
-
-  return result;
-}
-
 @Injectable()
 export class PathwayService {
   private readonly logger = new Logger(PathwayService.name);
@@ -67,7 +18,7 @@ export class PathwayService {
   async retrieveAnswer(
     clinicalQuestion: string,
     clinicalNotes: string,
-    filledTemplate: object,
+    filledTemplate: Record<string, string>[],
   ): Promise<SpecialistAIResponse> {
     const request = this.prepareRequest(
       clinicalQuestion,
@@ -82,7 +33,7 @@ export class PathwayService {
   retrieveAnswerStreamed(
     clinicalQuestion: string,
     clinicalNotes: string,
-    filledTemplate: object,
+    filledTemplate: Record<string, string>[],
   ): Observable<SpecialistAIResponse> {
     const request = this.prepareRequest(
       clinicalQuestion,
@@ -208,19 +159,11 @@ export class PathwayService {
   private answersRequestFromPreviousMessages(
     previousMessages: string[],
     shouldStream: boolean = false,
-  ) {
+  ): AnswersRequest {
     const request: AnswersRequest = new AnswersRequest([], shouldStream);
 
-    for (const previousMessage of previousMessages) {
-      const previousMessageSplit = splitIntoGivenAlphaNumCharLengths(
-        previousMessage,
-        PathwayMinAlphaNumLength,
-        PathwayMaxAlphaNumLength,
-      );
-      for (const previousMessageSlice of previousMessageSplit) {
-        request.messages.push(new Message('user', previousMessageSlice));
-      }
-    }
+    request.messages.push(new Message('user', previousMessages.join('\n')));
+
     this.logger.debug('Pathway API request: ', request);
     return request;
   }
@@ -281,38 +224,27 @@ export class PathwayService {
   private prepareRequest(
     clinicalQuestion: string,
     clinicalNotes: string,
-    filledTemplate: object,
+    filledTemplate: Record<string, string>[],
     shouldStream: boolean = false,
   ): AnswersRequest {
     const request: AnswersRequest = new AnswersRequest([], shouldStream);
 
-    const clinicalQuestionSplit = splitIntoGivenAlphaNumCharLengths(
-      clinicalQuestion,
-      PathwayMinAlphaNumLength,
-      PathwayMaxAlphaNumLength,
-    );
+    let combinedMessage =
+      'Clinical question: ' +
+      clinicalQuestion +
+      '\n Clinical notes: ' +
+      clinicalNotes +
+      '\n Additional information: ';
 
-    for (const clinicalQuestionSlice of clinicalQuestionSplit) {
-      request.messages.push(new Message('user', clinicalQuestionSlice));
+    for (const filledTemplateField of filledTemplate) {
+      combinedMessage +=
+        filledTemplateField['field'] +
+        ': ' +
+        filledTemplateField['value'] +
+        '\n';
     }
 
-    const clinicalNotesSplit = splitIntoGivenAlphaNumCharLengths(
-      clinicalNotes,
-      PathwayMinAlphaNumLength,
-      PathwayMaxAlphaNumLength,
-    );
-    for (const clinicalNotesSlice of clinicalNotesSplit) {
-      request.messages.push(new Message('user', clinicalNotesSlice));
-    }
-
-    const filledTemplateSplit = splitIntoGivenAlphaNumCharLengths(
-      JSON.stringify(filledTemplate),
-      PathwayMinAlphaNumLength,
-      PathwayMaxAlphaNumLength,
-    );
-    for (const filledTemplateSlice of filledTemplateSplit) {
-      request.messages.push(new Message('user', filledTemplateSlice));
-    }
+    request.messages.push(new Message('user', combinedMessage));
 
     this.logger.debug('Pathway API request: ', request);
     return request;
