@@ -1,4 +1,12 @@
-import { Body, Controller, Get, Logger, Post, Sse } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Logger,
+  Post,
+  Session,
+  Sse,
+} from '@nestjs/common';
 import { AppService } from './app.service';
 
 import { ReferralRequest } from './models/referralRequest';
@@ -24,9 +32,11 @@ export class AppController {
     type: ReferralResponse,
   })
   async postReferralQuestion(
+    @Session() session: Record<string, any>,
     @Body() request: ReferralRequest,
   ): Promise<ReferralResponse> {
     this.logger.debug('controller request', request);
+    session['referralRequest'] = request;
     return await this.appService.postReferralQuestion(request);
   }
 
@@ -38,9 +48,11 @@ export class AppController {
     type: ReferralResponse,
   })
   async postReferralQuestionStreamed(
+    @Session() session: Record<string, any>,
     @Body() request: ReferralRequest,
   ): Promise<Observable<{ data: ReferralResponse }>> {
     this.logger.debug('controller request', request);
+    session['referralRequest'] = request;
     return await this.appService.postReferralQuestionStreamed(request);
   }
 
@@ -51,9 +63,11 @@ export class AppController {
     type: SpecialistAIResponse,
   })
   async postPathwayQuestion(
+    @Session() session: Record<string, any>,
     @Body() request: string[],
   ): Promise<SpecialistAIResponse> {
     this.logger.debug('controller request', request);
+    this.logger.debug('session', session);
     return await this.appService.postPathwayQuestion(request);
   }
 
@@ -65,9 +79,11 @@ export class AppController {
     type: SpecialistAIResponse,
   })
   postPathwayQuestionStreamed(
+    @Session() session: Record<string, any>,
     @Body() request: string[],
   ): Observable<{ data: SpecialistAIResponse }> {
     this.logger.debug('controller request', request);
+    this.logger.debug('session', session);
     return this.appService.postPathwayQuestionStreamed(request);
   }
 
