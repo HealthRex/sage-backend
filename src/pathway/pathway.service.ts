@@ -33,7 +33,7 @@ export class PathwayService {
   retrieveAnswerStreamed(
     clinicalQuestion: string,
     clinicalNotes: string,
-    filledTemplate: object,
+    filledTemplate: Record<string, string>[],
   ): Observable<SpecialistAIResponse> {
     const request = this.prepareRequest(
       clinicalQuestion,
@@ -159,19 +159,11 @@ export class PathwayService {
   private answersRequestFromPreviousMessages(
     previousMessages: string[],
     shouldStream: boolean = false,
-  ) {
+  ): AnswersRequest {
     const request: AnswersRequest = new AnswersRequest([], shouldStream);
 
-    for (const previousMessage of previousMessages) {
-      const previousMessageSplit = splitIntoGivenAlphaNumCharLengths(
-        previousMessage,
-        PathwayMinAlphaNumLength,
-        PathwayMaxAlphaNumLength,
-      );
-      for (const previousMessageSlice of previousMessageSplit) {
-        request.messages.push(new Message('user', previousMessageSlice));
-      }
-    }
+    request.messages.push(new Message('user', previousMessages.join('\n')));
+
     this.logger.debug('Pathway API request: ', request);
     return request;
   }
