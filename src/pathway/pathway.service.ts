@@ -240,16 +240,16 @@ export class PathwayService {
     let combinedMessage =
       'Clinical question: ' +
       clinicalQuestion +
-      '\n' +
-      'Clinical notes: ' +
+      '\n Clinical notes: ' +
       clinicalNotes +
-      '\n';
+      '\n Additional information: ';
 
     for (const filledTemplateField of filledTemplate) {
-      for (const fieldKey in filledTemplateField) {
-        const fieldValue = filledTemplateField[fieldKey];
-        combinedMessage += fieldKey + ': ' + fieldValue + '\n';
-      }
+      combinedMessage +=
+        filledTemplateField['field'] +
+        ': ' +
+        filledTemplateField['value'] +
+        '\n';
     }
 
     request.messages.push(new Message('user', combinedMessage));
