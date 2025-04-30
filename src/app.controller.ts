@@ -14,6 +14,7 @@ import { ReferralResponse } from './models/referralResponse';
 import { ApiCreatedResponse, ApiOkResponse } from '@nestjs/swagger';
 import { Observable } from 'rxjs';
 import { SpecialistAIResponse } from './models/specialistAIResponse';
+import { SessionKeys } from './const';
 
 @Controller()
 export class AppController {
@@ -36,8 +37,12 @@ export class AppController {
     @Body() request: ReferralRequest,
   ): Promise<ReferralResponse> {
     this.logger.debug('controller request', request);
-    session['referralRequest'] = request;
-    return await this.appService.postReferralQuestion(request);
+    session[SessionKeys.REFERRAL_REQUEST] = request;
+
+    const response = await this.appService.postReferralQuestion(request);
+    session[SessionKeys.REFERRAL_RESPONSE] = response;
+
+    return response;
   }
 
   @Post('/referral-streamed')
@@ -52,8 +57,9 @@ export class AppController {
     @Body() request: ReferralRequest,
   ): Promise<Observable<{ data: ReferralResponse }>> {
     this.logger.debug('controller request', request);
-    session['referralRequest'] = request;
-    return await this.appService.postReferralQuestionStreamed(request);
+    session[SessionKeys.REFERRAL_REQUEST] = request;
+
+    return await this.appService.postReferralQuestionStreamed(request, session);
   }
 
   @Post('/ask-pathway')
@@ -64,11 +70,24 @@ export class AppController {
   })
   async postPathwayQuestion(
     @Session() session: Record<string, any>,
-    @Body() request: string[],
+    @Body('question') question: string,
   ): Promise<SpecialistAIResponse> {
-    this.logger.debug('controller request', request);
+    this.logger.debug('controller request', question);
     this.logger.debug('session', session);
-    return await this.appService.postPathwayQuestion(request);
+    const response: SpecialistAIResponse =
+      await this.appService.postPathwayQuestion(question, session);
+    if (session[SessionKeys.PREVIOUS_PATHWAY_CONVERSATIONS] == null) {
+      session[SessionKeys.PREVIOUS_PATHWAY_CONVERSATIONS] = [];
+    }
+    (
+      session[SessionKeys.PREVIOUS_PATHWAY_CONVERSATIONS] as Record<
+        string,
+        SpecialistAIResponse
+      >[]
+    ).push({
+      [question]: response,
+    });
+    return response;
   }
 
   @Post('/ask-pathway-streamed')
@@ -80,21 +99,27 @@ export class AppController {
   })
   postPathwayQuestionStreamed(
     @Session() session: Record<string, any>,
-    @Body() request: string[],
+    @Body('question') question: string,
   ): Observable<{ data: SpecialistAIResponse }> {
-    this.logger.debug('controller request', request);
+    this.logger.debug('controller request', question);
     this.logger.debug('session', session);
-    return this.appService.postPathwayQuestionStreamed(request);
+    if (session[SessionKeys.PREVIOUS_PATHWAY_CONVERSATIONS] == null) {
+      session[SessionKeys.PREVIOUS_PATHWAY_CONVERSATIONS] = [];
+    }
+    return this.appService.postPathwayQuestionStreamed(question, session);
   }
 
-  @Post('/followup-questions')
+  @Get('/followup-questions')
   @ApiCreatedResponse({
     description: 'Successfully generated followup questions from LLM.',
     type: 'string',
     isArray: true,
   })
-  generateFollowupQuestions(@Body() request: string[]): Promise<string[]> {
-    this.logger.debug('controller request', request);
-    return this.appService.generateFollowupQuestions(request);
+  generateFollowupQuestions(
+    @Session() session: Record<string, any>,
+  ): Promise<string[]> {
+    this.logger.debug('controller request for followup questions generation');
+    this.logger.debug('session', session);
+    return this.appService.generateFollowupQuestions(session);
   }
 }

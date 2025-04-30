@@ -8,6 +8,7 @@ import { Message } from './models/message';
 import { AnswersResponse } from './models/answersResponse';
 import { Citation, SpecialistAIResponse } from '../models/specialistAIResponse';
 import EventSourceStream from '@server-sent-stream/web';
+import { ChatRequest } from '../models/chatRequest';
 
 @Injectable()
 export class PathwayService {
@@ -20,7 +21,7 @@ export class PathwayService {
     clinicalNotes: string,
     filledTemplate: Record<string, string>[],
   ): Promise<SpecialistAIResponse> {
-    const request = this.prepareRequest(
+    const request = this.prepareAnswersRequest(
       clinicalQuestion,
       clinicalNotes,
       filledTemplate,
@@ -35,7 +36,7 @@ export class PathwayService {
     clinicalNotes: string,
     filledTemplate: Record<string, string>[],
   ): Observable<SpecialistAIResponse> {
-    const request = this.prepareRequest(
+    const request = this.prepareAnswersRequest(
       clinicalQuestion,
       clinicalNotes,
       filledTemplate,
@@ -46,11 +47,11 @@ export class PathwayService {
 
   // TODO try to merge with retrieveAnswer
   async retrieveChatAnswer(
-    previousMessages: string[],
+    chatRequest: ChatRequest,
   ): Promise<SpecialistAIResponse> {
     // TODO should previousMessages contain information about whether the message was from 'user' or 'assistant'?
     //      Will Pathway accept messages from 'assistant' as context?
-    const request = this.answersRequestFromPreviousMessages(previousMessages);
+    const request = this.toAnswersRequest(chatRequest);
     const data = await this.doSyncRequest(request);
 
     return this.specialistResponseFrom(data);
@@ -58,12 +59,12 @@ export class PathwayService {
 
   // TODO try to merge with retrieveAnswerStreamed
   retrieveChatAnswerStreamed(
-    previousMessages: string[],
+    chatRequest: ChatRequest,
   ): Observable<SpecialistAIResponse> {
     // TODO should previousMessages contain information about whether the message was from 'user' or 'assistant'?
     //      Will Pathway accept messages from 'assistant' as context?
-    const request = this.answersRequestFromPreviousMessages(
-      previousMessages,
+    const request = this.toAnswersRequest(
+      chatRequest,
       true, // shouldStream
     );
     return this.doAsyncRequest(request);
@@ -156,13 +157,47 @@ export class PathwayService {
     });
   }
 
-  private answersRequestFromPreviousMessages(
-    previousMessages: string[],
+  private toAnswersRequest(
+    chatRequest: ChatRequest,
     shouldStream: boolean = false,
   ): AnswersRequest {
     const request: AnswersRequest = new AnswersRequest([], shouldStream);
 
-    request.messages.push(new Message('user', previousMessages.join('\n')));
+    let message =
+      'Given clinical notes and your previous responses to questions, answer the following question:\n' +
+      chatRequest.question +
+      '\n' +
+      'INPUT:\n' +
+      'Clinical notes: ' +
+      chatRequest.originalReferralRequestNotes +
+      '.\n' +
+      'Your previous responses to questions: ' +
+      'Question 1: ' +
+      chatRequest.originalReferralRequestQuestion +
+      '.\n' +
+      'Your response 1: ' +
+      chatRequest.originalPathwayResponse +
+      '.\n';
+
+    let i = 1;
+    for (const previousConversation of chatRequest.previousConversations) {
+      for (const question in previousConversation) {
+        message +=
+          'Question ' +
+          i +
+          ': ' +
+          question +
+          '.\n' +
+          'Your response ' +
+          i +
+          ': ' +
+          previousConversation[question].summaryResponse +
+          '.\n';
+        i++;
+      }
+    }
+
+    request.messages.push(new Message('user', message));
 
     this.logger.debug('Pathway API request: ', request);
     return request;
@@ -221,7 +256,7 @@ export class PathwayService {
     return specialistResponse;
   }
 
-  private prepareRequest(
+  private prepareAnswersRequest(
     clinicalQuestion: string,
     clinicalNotes: string,
     filledTemplate: Record<string, string>[],
