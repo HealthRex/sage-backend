@@ -96,6 +96,10 @@ export class AppService {
         next: (next: ReferralResponse) => {
           accumulatedResponse = next;
           session[SessionKeys.REFERRAL_RESPONSE] = accumulatedResponse;
+
+          // reset Pathway conversation history on new referral request
+          session[SessionKeys.PREVIOUS_PATHWAY_CONVERSATIONS] = [];
+
           this.logger.debug('LLM partial response: ', next);
           subscriber.next({ data: next });
         },

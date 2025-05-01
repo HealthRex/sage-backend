@@ -41,6 +41,8 @@ export class AppController {
 
     const response = await this.appService.postReferralQuestion(request);
     session[SessionKeys.REFERRAL_RESPONSE] = response;
+    // reset Pathway conversation history on new referral request
+    session[SessionKeys.PREVIOUS_PATHWAY_CONVERSATIONS] = [];
 
     return response;
   }
