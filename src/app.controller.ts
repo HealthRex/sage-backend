@@ -5,6 +5,7 @@ import { ReferralRequest } from './models/referralRequest';
 import { ReferralResponse } from './models/referralResponse';
 import { ApiCreatedResponse, ApiOkResponse } from '@nestjs/swagger';
 import { Observable } from 'rxjs';
+import { SpecialistAIResponse } from './models/specialistAIResponse';
 
 @Controller()
 export class AppController {
@@ -13,8 +14,8 @@ export class AppController {
   constructor(private readonly appService: AppService) {}
 
   @Get()
-  getHello(): string {
-    return this.appService.getHello();
+  getRoot(): string {
+    return this.appService.getRoot();
   }
 
   @Post('/referral')
@@ -36,10 +37,48 @@ export class AppController {
       'Successfully received streamed AI response to clinical question.',
     type: ReferralResponse,
   })
-  postReferralQuestionStreamed(
+  async postReferralQuestionStreamed(
     @Body() request: ReferralRequest,
-  ): Observable<{ data: ReferralResponse }> {
+  ): Promise<Observable<{ data: ReferralResponse }>> {
     this.logger.debug('controller request', request);
-    return this.appService.postReferralQuestionStreamed(request);
+    return await this.appService.postReferralQuestionStreamed(request);
+  }
+
+  @Post('/ask-pathway')
+  @ApiCreatedResponse({
+    description:
+      'Successfully received Pathway AI response to a clarifying question.',
+    type: SpecialistAIResponse,
+  })
+  async postPathwayQuestion(
+    @Body() request: string[],
+  ): Promise<SpecialistAIResponse> {
+    this.logger.debug('controller request', request);
+    return await this.appService.postPathwayQuestion(request);
+  }
+
+  @Post('/ask-pathway-streamed')
+  @Sse()
+  @ApiOkResponse({
+    description:
+      'Successfully received streamed Pathway AI response to a clarifying question.',
+    type: SpecialistAIResponse,
+  })
+  postPathwayQuestionStreamed(
+    @Body() request: string[],
+  ): Observable<{ data: SpecialistAIResponse }> {
+    this.logger.debug('controller request', request);
+    return this.appService.postPathwayQuestionStreamed(request);
+  }
+
+  @Post('/followup-questions')
+  @ApiCreatedResponse({
+    description: 'Successfully generated followup questions from LLM.',
+    type: 'string',
+    isArray: true,
+  })
+  generateFollowupQuestions(@Body() request: string[]): Promise<string[]> {
+    this.logger.debug('controller request', request);
+    return this.appService.generateFollowupQuestions(request);
   }
 }

@@ -1,7 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
 import {
   CoreMessage,
+  FilePart,
   generateObject,
+  ImagePart,
   LanguageModelV1,
   streamObject,
   TextPart,
@@ -16,9 +18,10 @@ import { ReferralResponse } from './models/referralResponse';
 import { TemplateSelectorService } from './template-selector/template-selector.service';
 import { PathwayService } from './pathway/pathway.service';
 import { SpecialistAIResponse } from './models/specialistAIResponse';
-import { Observable } from 'rxjs';
+import { map, Observable } from 'rxjs';
 import { fromReadableStreamLike } from 'rxjs/internal/observable/innerFrom';
 import { LLMResponse, llmResponseSchema } from './models/llmResponse';
+import { z } from 'zod';
 
 enum AIProvider {
   Claude = 'CLAUDE',
@@ -29,6 +32,8 @@ enum AIProvider {
 const systemPromptFilePath: string = './resources/prompt.txt';
 const systemPromptWithoutTemplatesFilePath: string =
   './resources/prompt_no_matched_templates.txt';
+const systemPromptFollowupQuestionsFilePath: string =
+  './resources/prompt_followup_questions.txt';
 
 // const referralTemplateFileMimeType: string = 'application/pdf';
 // const referralTemplateFilePath: string =
@@ -43,16 +48,22 @@ export class AppService {
     private readonly pathwayService: PathwayService,
   ) {}
 
-  getHello(): string {
-    return 'Hello World!';
+  getRoot(): string {
+    return 'Stanford eConsult Backend service';
   }
 
   async postReferralQuestion(
     request: ReferralRequest,
   ): Promise<ReferralResponse> {
-    this.logger.debug('request: ', request);
-
-    const llmResponse = await this.queryLLM(request);
+    const systemPrompt = await this.selectSystemPrompt(request);
+    const llmResponse = await this.queryLLM<LLMResponse>(
+      systemPrompt,
+      [
+        'Clinical question: ' + request.question,
+        'Patient notes: ' + request.clinicalNotes,
+      ],
+      llmResponseSchema,
+    );
     const pathwayResponse = await this.queryPathway(request, llmResponse);
     const response: ReferralResponse = llmResponse as ReferralResponse;
     response.specialistAIResponse = pathwayResponse;
@@ -62,140 +73,134 @@ export class AppService {
     return response;
   }
 
-  postReferralQuestionStreamed2(
+  async postReferralQuestionStreamed(
     request: ReferralRequest,
-  ): Observable<{ data: ReferralResponse }> {
+  ): Promise<Observable<{ data: ReferralResponse }>> {
+    const systemPrompt = await this.selectSystemPrompt(request);
+    const llmResponseObservable: Observable<ReferralResponse> =
+      this.queryLLMStreamed<ReferralResponse>(
+        systemPrompt,
+        [
+          'Clinical question: ' + request.question,
+          'Patient notes: ' + request.clinicalNotes,
+        ],
+        llmResponseSchema,
+      );
+
     return new Observable((subscriber) => {
-      this.logger.debug('request: ', request);
-
-      this.queryLLMStreamed(request)
-        .then((llmResponseStream) => {
-          let accumulatedResponse: ReferralResponse = new ReferralResponse();
-          llmResponseStream
-            .subscribe((next: ReferralResponse) => {
-              accumulatedResponse = next;
-              subscriber.next({ data: accumulatedResponse });
-            })
-            .add(() =>
-              this.queryPathwayStreamed(request, accumulatedResponse).subscribe(
-                (specialistAIResponse) => {
-                  accumulatedResponse.specialistAIResponse =
-                    specialistAIResponse;
-
-                  subscriber.next({ data: accumulatedResponse });
-
-                  this.logger.debug('response: ', accumulatedResponse);
-                  subscriber.complete();
-                },
-              ),
-            );
-        })
-
-        .catch((reason) => {
+      let accumulatedResponse: ReferralResponse = new ReferralResponse();
+      llmResponseObservable.subscribe({
+        next: (next: ReferralResponse) => {
+          accumulatedResponse = next;
+          subscriber.next({ data: next });
+        },
+        error: (reason) => {
+          this.logger.error('error querying LLM: ', reason);
           subscriber.error(reason);
-        });
-    });
-  }
-
-  postReferralQuestionStreamed(
-    request: ReferralRequest,
-  ): Observable<{ data: ReferralResponse }> {
-    return new Observable((subscriber) => {
-      this.logger.debug('request: ', request);
-
-      this.queryLLMStreamed(request)
-        .then((llmResponseStream) => {
-          let accumulatedResponse: ReferralResponse = new ReferralResponse();
-          llmResponseStream
-            .subscribe((next: ReferralResponse) => {
-              accumulatedResponse = next;
-              subscriber.next({ data: accumulatedResponse });
-            })
-            .add(() => {
-              this.queryPathway(request, accumulatedResponse)
-                .then((specialistAIResponse) => {
-                  accumulatedResponse.specialistAIResponse =
-                    specialistAIResponse;
-
-                  subscriber.next({ data: accumulatedResponse });
-
-                  this.logger.debug('response: ', accumulatedResponse);
-                  subscriber.complete();
-                })
-                .catch((reason) => {
-                  this.logger.error(
-                    'error occurred trying to query Pathway: ',
-                    reason,
-                  );
-                  subscriber.error(reason);
-                });
+        },
+        complete: () => {
+          this.queryPathwayStreamed(request, accumulatedResponse)
+            .pipe(
+              map((specialistAIResponse: SpecialistAIResponse) => {
+                accumulatedResponse.specialistAIResponse = specialistAIResponse;
+                return accumulatedResponse;
+              }),
+            )
+            .subscribe({
+              next: (next: ReferralResponse) => {
+                subscriber.next({ data: next });
+              },
+              complete: () => subscriber.complete(),
+              error: (reason) => {
+                this.logger.error('error querying LLM: ', reason);
+                subscriber.error(reason);
+              },
             });
-        })
-        .catch((reason) => {
-          this.logger.error('error occurred trying to query LLM: ', reason);
-          subscriber.error(reason);
-        });
+        },
+      });
     });
   }
 
-  private async queryLLM(request: ReferralRequest): Promise<LLMResponse> {
-    const input = await this.prepareLLMInput(request);
+  async postPathwayQuestion(request: string[]): Promise<SpecialistAIResponse> {
+    return this.pathwayService.retrieveChatAnswer(request);
+  }
 
-    const { object } = await generateObject(input);
+  postPathwayQuestionStreamed(
+    request: string[],
+  ): Observable<{ data: SpecialistAIResponse }> {
+    return this.pathwayService.retrieveChatAnswerStreamed(request).pipe(
+      map((next) => {
+        return { data: next };
+      }),
+    );
+  }
 
+  generateFollowupQuestions(request: string[]): Promise<string[]> {
+    const systemPrompt = fs
+      .readFileSync(join(process.cwd(), systemPromptFollowupQuestionsFilePath))
+      .toString();
+    const responseSchema = z.string().array();
+
+    return this.queryLLM<string[]>(systemPrompt, request, responseSchema);
+  }
+
+  private async queryLLM<T>(
+    systemPrompt: string,
+    messages: string[],
+    responseSchema: z.Schema<any, z.ZodTypeDef, any>,
+  ): Promise<T> {
+    const input = this.prepareLLMInput(systemPrompt, messages, responseSchema);
+
+    const { object } = await generateObject<T>(input);
     this.logger.debug('structured response:', object);
 
-    return object as LLMResponse;
+    return object;
   }
 
-  private async queryLLMStreamed(request: ReferralRequest) {
-    const input = await this.prepareLLMInput(request);
+  private queryLLMStreamed<T>(
+    systemPrompt: string,
+    messages: string[],
+    responseSchema: z.Schema<any, z.ZodTypeDef, any>,
+  ): Observable<T> {
+    const input = this.prepareLLMInput(systemPrompt, messages, responseSchema);
 
     // @ts-expect-error("it is complaining that error has any type")
     // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
     (input as any).onError = ({ error }) => {
-      this.logger.error('error during streaming structured response:', error); // your error logging logic here
+      this.logger.error('error during streaming structured response:', error);
     };
 
     const { partialObjectStream } = streamObject(input);
 
-    return fromReadableStreamLike(partialObjectStream as ReadableStream);
+    return fromReadableStreamLike<T>(partialObjectStream as ReadableStream);
   }
 
-  private async prepareLLMInput(request: ReferralRequest) {
-    const systemPrompt = await this.selectSystemPrompt(request);
-
-    // const referralTemplatesBase64: string = Buffer.from(
-    //   fs.readFileSync(referralTemplateFilePath).toString(),
-    // ).toString('base64');
-
+  private prepareLLMInput(
+    systemPrompt: string,
+    messages: string[],
+    responseSchema: z.Schema<any, z.ZodTypeDef, any>,
+  ) {
     const input = {
       model: this.selectModel(),
-      schema: llmResponseSchema,
+      schema: responseSchema,
       system: systemPrompt,
       messages: [
         {
           role: 'user',
-          content: [
-            {
-              type: 'text',
-              text: 'Clinical question: ' + request.question,
-            } as TextPart,
-            {
-              type: 'text',
-              text: 'Patient notes: ' + request.clinicalNotes,
-            } as TextPart,
-            // {
-            //   type: 'file',
-            //   data: referralTemplatesBase64,
-            //   mimeType: referralTemplateFileMimeType,
-            // },
-          ] as UserContent,
+          content: [] as UserContent,
         } as CoreMessage,
       ],
     };
 
-    // this.logger.debug('referralTemplatesBase64: ', referralTemplatesBase64);
+    for (const message of messages) {
+      (
+        input.messages[0].content as Array<TextPart | ImagePart | FilePart>
+      ).push({
+        type: 'text',
+        text: message,
+      } as TextPart);
+    }
+
     this.logger.debug('input: ', input);
     return input;
   }

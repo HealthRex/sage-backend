@@ -1,5 +1,16 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { z } from 'zod';
+
+export class Citation {
+  constructor(name: string, url: string) {
+    this.name = name;
+    this.url = url;
+  }
+
+  @ApiProperty({ description: 'Citation name' })
+  name: string;
+  @ApiProperty({ description: 'Citation URL' })
+  url: string;
+}
 
 export class SpecialistAIResponse {
   @ApiProperty({ description: 'Summary response' })
@@ -14,14 +25,6 @@ export class SpecialistAIResponse {
   @ApiProperty({ description: 'Suggested Medication' })
   suggestedMedications: string[];
 
-  @ApiProperty({ description: 'Citations' })
-  citations: string[];
+  @ApiProperty({ description: 'Citations', type: [Citation] })
+  citations: Citation[];
 }
-
-export const specialistAIResponseSchema = z.object({
-  summaryResponse: z.string(),
-  suggestedLabOrders: z.array(z.string()),
-  suggestedImaging: z.array(z.string()),
-  suggestedMedications: z.array(z.string()),
-  citations: z.array(z.string()),
-});

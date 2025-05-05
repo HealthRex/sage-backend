@@ -6,7 +6,8 @@ import { AxiosError } from 'axios';
 import { AnswersRequest } from './models/answersRequest';
 import { Message } from './models/message';
 import { AnswersResponse } from './models/answersResponse';
-import { SpecialistAIResponse } from '../models/specialistAIResponse';
+import { Citation, SpecialistAIResponse } from '../models/specialistAIResponse';
+import EventSourceStream from '@server-sent-stream/web';
 
 @Injectable()
 export class PathwayService {
@@ -24,8 +25,150 @@ export class PathwayService {
       clinicalNotes,
       filledTemplate,
     );
-    this.logger.debug('Pathway API request: ', request);
 
+    const data = await this.doSyncRequest(request);
+    return this.specialistResponseFrom(data);
+  }
+
+  retrieveAnswerStreamed(
+    clinicalQuestion: string,
+    clinicalNotes: string,
+    filledTemplate: Record<string, string>[],
+  ): Observable<SpecialistAIResponse> {
+    const request = this.prepareRequest(
+      clinicalQuestion,
+      clinicalNotes,
+      filledTemplate,
+      true,
+    );
+    return this.doAsyncRequest(request);
+  }
+
+  // TODO try to merge with retrieveAnswer
+  async retrieveChatAnswer(
+    previousMessages: string[],
+  ): Promise<SpecialistAIResponse> {
+    // TODO should previousMessages contain information about whether the message was from 'user' or 'assistant'?
+    //      Will Pathway accept messages from 'assistant' as context?
+    const request = this.answersRequestFromPreviousMessages(previousMessages);
+    const data = await this.doSyncRequest(request);
+
+    return this.specialistResponseFrom(data);
+  }
+
+  // TODO try to merge with retrieveAnswerStreamed
+  retrieveChatAnswerStreamed(
+    previousMessages: string[],
+  ): Observable<SpecialistAIResponse> {
+    // TODO should previousMessages contain information about whether the message was from 'user' or 'assistant'?
+    //      Will Pathway accept messages from 'assistant' as context?
+    const request = this.answersRequestFromPreviousMessages(
+      previousMessages,
+      true, // shouldStream
+    );
+    return this.doAsyncRequest(request);
+  }
+
+  private doAsyncRequest(
+    request: AnswersRequest,
+  ): Observable<SpecialistAIResponse> {
+    return new Observable<SpecialistAIResponse>((subscriber) => {
+      const accumulatedResponse: SpecialistAIResponse =
+        new SpecialistAIResponse();
+      accumulatedResponse.summaryResponse = '';
+      accumulatedResponse.citations = [];
+
+      this.httpService.axiosRef
+        .post<ReadableStream>(String(process.env.PATHWAY_API), request, {
+          headers: {
+            Authorization: 'Bearer ' + process.env.PATHWAY_AI_API_KEY,
+            Accept: 'text/event-stream',
+          },
+          responseType: 'stream',
+          adapter: 'fetch',
+        })
+        .then(async (response) => {
+          const stream = response.data; // <- should be a ReadableStream
+
+          const decoder = new EventSourceStream();
+          stream.pipeThrough(decoder);
+
+          // Read from the EventSourceStream
+          const reader = decoder.readable.getReader();
+
+          while (true) {
+            const { value, done } = await reader.read();
+            if (done) {
+              break;
+            }
+
+            this.logger.debug('Pathway MessageEvent: ', value.data);
+            if (value.data == null) {
+              // TODO is this an error?
+              break;
+            }
+            const parsedResponse = plainToInstance(
+              AnswersResponse,
+              JSON.parse(value.data),
+            );
+
+            let receivedNewData = false;
+            let specialistResponseStr: string = '';
+            for (const choice of parsedResponse.choices) {
+              if (choice.delta?.content) {
+                specialistResponseStr += choice.delta.content;
+                receivedNewData = true;
+              }
+            }
+            if (receivedNewData) {
+              accumulatedResponse.summaryResponse += specialistResponseStr;
+            }
+            if (
+              parsedResponse.citationsDetailed &&
+              parsedResponse.citationsDetailed.length >
+                accumulatedResponse.citations.length
+            ) {
+              receivedNewData = true;
+              for (
+                let i = accumulatedResponse.citations.length;
+                i < parsedResponse.citationsDetailed.length;
+                i++
+              ) {
+                accumulatedResponse.citations.push(
+                  new Citation(
+                    parsedResponse.citationsDetailed[i].name,
+                    parsedResponse.citations[i],
+                  ),
+                );
+              }
+            }
+
+            if (receivedNewData) {
+              subscriber.next(accumulatedResponse);
+            }
+          }
+          subscriber.complete();
+        })
+        .catch((error) => {
+          this.logger.error('error querying Pathway API: ', error);
+          subscriber.error(error);
+        });
+    });
+  }
+
+  private answersRequestFromPreviousMessages(
+    previousMessages: string[],
+    shouldStream: boolean = false,
+  ): AnswersRequest {
+    const request: AnswersRequest = new AnswersRequest([], shouldStream);
+
+    request.messages.push(new Message('user', previousMessages.join('\n')));
+
+    this.logger.debug('Pathway API request: ', request);
+    return request;
+  }
+
+  private async doSyncRequest(request: AnswersRequest) {
     const { data } = await lastValueFrom(
       this.httpService
         .post<AnswersResponse, AnswersRequest>(
@@ -35,7 +178,6 @@ export class PathwayService {
             headers: {
               Authorization: 'Bearer ' + process.env.PATHWAY_AI_API_KEY,
             },
-            // responseType: 'stream'
           },
         )
         .pipe(
@@ -60,228 +202,32 @@ export class PathwayService {
         ),
     );
     this.logger.debug('data', data);
+    return data;
+  }
 
+  private specialistResponseFrom(data: AnswersResponse): SpecialistAIResponse {
     const specialistResponse: SpecialistAIResponse = new SpecialistAIResponse();
     let specialistResponseStr: string = '';
     for (const choice of data.choices) {
       specialistResponseStr += choice.message.content;
     }
     specialistResponse.summaryResponse = specialistResponseStr;
-    specialistResponse.citations = data.citations;
-
+    specialistResponse.citations = [];
+    for (let i = 0; i < data.citationsDetailed.length; i++) {
+      specialistResponse.citations.push(
+        new Citation(data.citationsDetailed[i].name, data.citations[i]),
+      );
+    }
     return specialistResponse;
-  }
-
-  retrieveAnswerStreamed(
-    clinicalQuestion: string,
-    clinicalNotes: string,
-    filledTemplate: Record<string, string>[],
-  ): Observable<SpecialistAIResponse> {
-    const request = this.prepareRequest(
-      clinicalQuestion,
-      clinicalNotes,
-      filledTemplate,
-    );
-    request.stream = true;
-    this.logger.debug('Pathway API request: ', request);
-
-    const accumulatedResponse: SpecialistAIResponse =
-      new SpecialistAIResponse();
-    accumulatedResponse.citations = [];
-
-    return new Observable<SpecialistAIResponse>((subscriber) => {
-      this.httpService
-        .post<ReadableStream, AnswersRequest>(
-          String(process.env.PATHWAY_API),
-          request,
-          {
-            headers: {
-              Authorization: 'Bearer ' + process.env.PATHWAY_AI_API_KEY,
-            },
-            responseType: 'stream',
-            // decompress: true,
-            adapter: 'fetch',
-          },
-        )
-        .subscribe({
-          next(value) {
-            console.log(
-              'Pathway API partial response type: ',
-              typeof value.data,
-            );
-
-            const reader = value.data.getReader();
-            const decoder = new TextDecoder();
-            let readFinished = false;
-
-            while (!readFinished) {
-              reader
-                .read()
-                .then(({ done, value }) => {
-                  if (done) {
-                    readFinished = true;
-                    subscriber.complete();
-                    return;
-                  }
-
-                  const chunk = decoder.decode(value, { stream: true });
-                  const lines = chunk
-                    .split('\n')
-                    .filter(Boolean)
-                    .filter((value) => value.startsWith('data: '));
-
-                  for (const line of lines) {
-                    try {
-                      const message = line.replace(/^data: /, '');
-                      // if (message === '[DONE]') {
-                      //   subscriber.complete();
-                      //   return;
-                      // }
-                      try {
-                        const parsedResponse = plainToInstance(
-                          AnswersResponse,
-                          JSON.parse(message),
-                        );
-
-                        let specialistResponseStr: string = '';
-                        for (const choice of parsedResponse.choices) {
-                          specialistResponseStr += choice.delta.content;
-                        }
-                        accumulatedResponse.summaryResponse =
-                          specialistResponseStr;
-                        accumulatedResponse.citations.push(
-                          ...parsedResponse.citations,
-                        );
-
-                        subscriber.next(accumulatedResponse);
-                      } catch (error) {
-                        console.error(
-                          'Could not JSON parse stream message',
-                          message,
-                          error,
-                        );
-                        subscriber.error(error);
-                      }
-                    } catch (error) {
-                      console.error('Error parsing update:', error);
-                    }
-                  }
-                })
-                .catch((error) => {
-                  subscriber.error(error);
-                })
-                .finally(() => {
-                  readFinished = true;
-                });
-            }
-
-            // const dataStr = value.data;
-            // console.log('Pathway API partial response: ', dataStr);
-            //
-            // const lines = dataStr
-            //   .toString()
-            //   .split('\n')
-            //   .filter(
-            //     (line) => line.trim() !== '' && line.startsWith('data: '),
-            //   );
-            // for (const line of lines) {
-            //   const message = line.replace(/^data: /, '');
-            //   // if (message === '[DONE]') {
-            //   //   subscriber.complete();
-            //   //   return;
-            //   // }
-            //   try {
-            //     const parsedResponse = plainToInstance(
-            //       AnswersResponse,
-            //       JSON.parse(message),
-            //     );
-            //
-            //     let specialistResponseStr: string = '';
-            //     for (const choice of parsedResponse.choices) {
-            //       specialistResponseStr += choice.delta.content;
-            //     }
-            //     accumulatedResponse.summaryResponse = specialistResponseStr;
-            //     accumulatedResponse.citations.push(...parsedResponse.citations);
-            //
-            //     subscriber.next(accumulatedResponse);
-            //   } catch (error) {
-            //     console.error(
-            //       'Could not JSON parse stream message',
-            //       message,
-            //       error,
-            //     );
-            //     subscriber.error(error);
-            //   }
-            // }
-          },
-          complete() {
-            console.log('Pathway API partial responses completed');
-            subscriber.complete();
-          },
-        });
-    });
-
-    // return this.httpService
-    //   .post<string, AnswersRequest>(String(process.env.PATHWAY_API), request, {
-    //     headers: {
-    //       Authorization: 'Bearer ' + process.env.PATHWAY_AI_API_KEY,
-    //     },
-    //     // responseType: 'stream',
-    //   })
-    //   .pipe(
-    //     // looks like we need to manually map the data to the type we want via class-transform
-    //     map((response) => {
-    //       // const lines = response.data
-    //       //   .toString()
-    //       //   .split('\n')
-    //       //   .filter((line) => line.trim() !== '');
-    //       // for (const line of lines) {
-    //       //   const message = line.replace(/^data: /, '');
-    //       //   if (message === '[DONE]') {
-    //       //     res.write('data: DONE\n\n');
-    //       //     res.end();
-    //       //     return;
-    //       //   }
-    //       //   const parsed = JSON.parse(message);
-    //       //   res.write(`data: ${parsed.choices[0].text}\n\n`);
-    //       // }
-    //       this.logger.debug('Response: ', response);
-    //
-    //       const parsedResponse = plainToInstance(
-    //         AnswersResponse,
-    //         JSON.parse(response.data),
-    //       );
-    //
-    //       let specialistResponseStr: string = '';
-    //       for (const choice of parsedResponse.choices) {
-    //         specialistResponseStr += choice.delta.content;
-    //       }
-    //       accumulatedResponse.summaryResponse = specialistResponseStr;
-    //       accumulatedResponse.citations.push(...parsedResponse.citations);
-    //
-    //       return accumulatedResponse;
-    //     }),
-    //   )
-    //   .pipe(
-    //     catchError((error: AxiosError) => {
-    //       // in case of an error just return the empty response
-    //       this.logger.error(
-    //         'error querying Pathway API',
-    //         error.response?.data,
-    //         request.messages,
-    //       );
-    //       // throw new Error('Error querying Pathway API');
-    //       return of(new SpecialistAIResponse());
-    //     }),
-    //   );
   }
 
   private prepareRequest(
     clinicalQuestion: string,
     clinicalNotes: string,
     filledTemplate: Record<string, string>[],
-  ) {
-    const request: AnswersRequest = new AnswersRequest([]);
+    shouldStream: boolean = false,
+  ): AnswersRequest {
+    const request: AnswersRequest = new AnswersRequest([], shouldStream);
 
     let combinedMessage =
       'Clinical question: ' +
@@ -300,6 +246,7 @@ export class PathwayService {
 
     request.messages.push(new Message('user', combinedMessage));
 
+    this.logger.debug('Pathway API request: ', request);
     return request;
   }
 }
