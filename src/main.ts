@@ -2,6 +2,8 @@ import { NestFactory } from '@nestjs/core';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 import { ValidationPipe } from '@nestjs/common';
+import * as session from 'express-session';
+import * as sessionFileStore from 'session-file-store';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, {
@@ -13,6 +15,18 @@ async function bootstrap() {
   app.useGlobalPipes(
     new ValidationPipe({
       transform: true,
+    }),
+  );
+
+  // config sessions
+  const MemoryStore: sessionFileStore.FileStore = sessionFileStore(session);
+  const fileStoreOptions = {};
+  app.use(
+    session({
+      store: new MemoryStore(fileStoreOptions),
+      secret: process.env.SESSION_SECRET as string,
+      resave: false,
+      saveUninitialized: false,
     }),
   );
 

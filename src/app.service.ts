@@ -18,10 +18,12 @@ import { ReferralResponse } from './models/referralResponse';
 import { TemplateSelectorService } from './template-selector/template-selector.service';
 import { PathwayService } from './pathway/pathway.service';
 import { SpecialistAIResponse } from './models/specialistAIResponse';
-import { map, Observable } from 'rxjs';
+import { map, Observable, tap } from 'rxjs';
 import { fromReadableStreamLike } from 'rxjs/internal/observable/innerFrom';
 import { LLMResponse, llmResponseSchema } from './models/llmResponse';
 import { z } from 'zod';
+import { ChatRequest } from './models/chatRequest';
+import { SessionKeys } from './const';
 
 enum AIProvider {
   Claude = 'CLAUDE',
@@ -75,6 +77,7 @@ export class AppService {
 
   async postReferralQuestionStreamed(
     request: ReferralRequest,
+    session: Record<string, any>,
   ): Promise<Observable<{ data: ReferralResponse }>> {
     const systemPrompt = await this.selectSystemPrompt(request);
     const llmResponseObservable: Observable<ReferralResponse> =
@@ -92,6 +95,12 @@ export class AppService {
       llmResponseObservable.subscribe({
         next: (next: ReferralResponse) => {
           accumulatedResponse = next;
+          session[SessionKeys.REFERRAL_RESPONSE] = accumulatedResponse;
+
+          // reset Pathway conversation history on new referral request
+          session[SessionKeys.PREVIOUS_PATHWAY_CONVERSATIONS] = [];
+
+          this.logger.debug('LLM partial response: ', next);
           subscriber.next({ data: next });
         },
         error: (reason) => {
@@ -108,6 +117,7 @@ export class AppService {
             )
             .subscribe({
               next: (next: ReferralResponse) => {
+                session[SessionKeys.REFERRAL_RESPONSE] = next;
                 subscriber.next({ data: next });
               },
               complete: () => subscriber.complete(),
@@ -121,24 +131,97 @@ export class AppService {
     });
   }
 
-  async postPathwayQuestion(request: string[]): Promise<SpecialistAIResponse> {
-    return this.pathwayService.retrieveChatAnswer(request);
+  async postPathwayQuestion(
+    request: string,
+    session: Record<string, any>,
+  ): Promise<SpecialistAIResponse> {
+    const chatRequest: ChatRequest = this.prepareChatRequest(session, request);
+    return this.pathwayService.retrieveChatAnswer(chatRequest);
   }
 
   postPathwayQuestionStreamed(
-    request: string[],
+    request: string,
+    session: Record<string, any>,
   ): Observable<{ data: SpecialistAIResponse }> {
-    return this.pathwayService.retrieveChatAnswerStreamed(request).pipe(
-      map((next) => {
-        return { data: next };
-      }),
-    );
+    const chatRequest: ChatRequest = this.prepareChatRequest(session, request);
+    let accumulatedResponse: SpecialistAIResponse;
+    return new Observable((subscriber) => {
+      this.pathwayService
+        .retrieveChatAnswerStreamed(chatRequest)
+        .pipe(
+          tap((next) => {
+            accumulatedResponse = next;
+          }),
+          map((next) => {
+            return { data: next };
+          }),
+        )
+        .subscribe({
+          next: (next) => {
+            subscriber.next(next);
+          },
+          complete: () => {
+            (
+              session[SessionKeys.PREVIOUS_PATHWAY_CONVERSATIONS] as Record<
+                string,
+                SpecialistAIResponse
+              >[]
+            ).push({
+              [request]: accumulatedResponse,
+            });
+            subscriber.complete();
+          },
+          error: (reason) => {
+            this.logger.error('error querying Pathway: ', reason, chatRequest);
+            subscriber.error(reason);
+          },
+        });
+    });
   }
 
-  generateFollowupQuestions(request: string[]): Promise<string[]> {
+  generateFollowupQuestions(session: Record<string, any>): Promise<string[]> {
     const systemPrompt = fs
       .readFileSync(join(process.cwd(), systemPromptFollowupQuestionsFilePath))
       .toString();
+
+    if (
+      session[SessionKeys.REFERRAL_REQUEST] == null ||
+      (session[SessionKeys.REFERRAL_REQUEST] as ReferralRequest).question ==
+        null ||
+      session[SessionKeys.REFERRAL_RESPONSE] == null ||
+      (session[SessionKeys.REFERRAL_RESPONSE] as ReferralResponse)
+        .specialistAIResponse == null ||
+      (session[SessionKeys.REFERRAL_RESPONSE] as ReferralResponse)
+        .specialistAIResponse?.summaryResponse == null
+    ) {
+      return Promise.reject(
+        new Error(
+          'either referralRequest (or its question field) or' +
+            ' referralResponse (or its specialistAIResponse field or its summaryResponse field) are empty',
+        ),
+      );
+    }
+
+    let lastPathwayResponse = (
+      session[SessionKeys.REFERRAL_RESPONSE] as ReferralResponse
+    ).specialistAIResponse?.summaryResponse;
+    if (session[SessionKeys.PREVIOUS_PATHWAY_CONVERSATIONS] != null) {
+      const lastPathwayConversation = (
+        session[SessionKeys.PREVIOUS_PATHWAY_CONVERSATIONS] as Record<
+          string,
+          SpecialistAIResponse
+        >[]
+      ).at(-1);
+      for (const question in lastPathwayConversation) {
+        lastPathwayResponse = lastPathwayConversation[question].summaryResponse;
+      }
+    }
+    const request = [
+      'Clinical question: ' +
+        (session[SessionKeys.REFERRAL_REQUEST] as ReferralRequest).question,
+      'LLM-generated specialist response: ' + lastPathwayResponse,
+    ];
+
     const responseSchema = z.string().array();
 
     return this.queryLLM<string[]>(systemPrompt, request, responseSchema);
@@ -255,5 +338,37 @@ export class AppService {
       default:
         throw new Error('unknown AI_PROVIDER type selected');
     }
+  }
+
+  private prepareChatRequest(session: Record<string, any>, request: string) {
+    const originalReferralRequest = session[
+      'referralRequest'
+    ] as ReferralRequest;
+    const originalReferralResponse = session[
+      'referralResponse'
+    ] as ReferralResponse;
+    let previousConversations: Record<string, SpecialistAIResponse>[] = session[
+      'previousPathwayConversations'
+    ] as Record<string, SpecialistAIResponse>[];
+    if (previousConversations == null) {
+      previousConversations = [];
+    }
+
+    let originalSpecialistAIResponse: SpecialistAIResponse =
+      new SpecialistAIResponse();
+    if (
+      originalReferralResponse &&
+      originalReferralResponse.specialistAIResponse
+    ) {
+      originalSpecialistAIResponse =
+        originalReferralResponse.specialistAIResponse;
+    }
+    return new ChatRequest(
+      request,
+      originalReferralRequest.question,
+      originalReferralRequest.clinicalNotes,
+      originalSpecialistAIResponse.summaryResponse,
+      previousConversations,
+    );
   }
 }
