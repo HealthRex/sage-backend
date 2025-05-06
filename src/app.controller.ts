@@ -11,7 +11,7 @@ import { AppService } from './app.service';
 
 import { ReferralRequest } from './models/referralRequest';
 import { ReferralResponse } from './models/referralResponse';
-import { ApiCreatedResponse, ApiOkResponse } from '@nestjs/swagger';
+import { ApiBody, ApiCreatedResponse, ApiOkResponse } from '@nestjs/swagger';
 import { Observable } from 'rxjs';
 import { SpecialistAIResponse } from './models/specialistAIResponse';
 import { SessionKeys } from './const';
@@ -65,6 +65,13 @@ export class AppController {
   }
 
   @Post('/ask-pathway')
+  @ApiBody({
+    schema: {
+      properties: {
+        question: { type: 'string' },
+      },
+    },
+  })
   @ApiCreatedResponse({
     description:
       'Successfully received Pathway AI response to a clarifying question.',
@@ -94,6 +101,13 @@ export class AppController {
 
   @Post('/ask-pathway-streamed')
   @Sse()
+  @ApiBody({
+    schema: {
+      properties: {
+        question: { type: 'string' },
+      },
+    },
+  })
   @ApiOkResponse({
     description:
       'Successfully received streamed Pathway AI response to a clarifying question.',
