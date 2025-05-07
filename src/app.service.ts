@@ -24,6 +24,7 @@ import { LLMResponse, llmResponseSchema } from './models/llmResponse';
 import { z } from 'zod';
 import { ChatRequest } from './models/chatRequest';
 import { SessionKeys } from './const';
+import { ColorAiService } from './color-ai/color-ai.service';
 
 enum AIProvider {
   Claude = 'CLAUDE',
@@ -48,6 +49,7 @@ export class AppService {
   constructor(
     private readonly templateSelectorService: TemplateSelectorService,
     private readonly pathwayService: PathwayService,
+    private readonly colorAiService: ColorAiService,
   ) {}
 
   getRoot(): string {
@@ -57,8 +59,13 @@ export class AppService {
   async postReferralQuestion(
     request: ReferralRequest,
   ): Promise<ReferralResponse> {
-    const systemPrompt = await this.selectSystemPrompt(request);
-    const llmResponse = await this.queryLLM<LLMResponse>(
+    const systemPrompt: string = await this.selectSystemPrompt(request);
+    const colorPromise: Promise<Record<string, string>> =
+      this.colorAiService.retrieveFilledTemplate(
+        'hypothyroidism',
+        request.clinicalNotes,
+      );
+    const llmResponse: LLMResponse = await this.queryLLM<LLMResponse>(
       systemPrompt,
       [
         'Clinical question: ' + request.question,
@@ -66,9 +73,15 @@ export class AppService {
       ],
       llmResponseSchema,
     );
-    const pathwayResponse = await this.queryPathway(request, llmResponse);
+    const pathwayResponse: SpecialistAIResponse = await this.queryPathway(
+      request,
+      llmResponse,
+    );
     const response: ReferralResponse = llmResponse as ReferralResponse;
     response.specialistAIResponse = pathwayResponse;
+
+    const filledTemplate: Record<string, string> = await colorPromise;
+    response.populatedTemplate = [filledTemplate];
 
     this.logger.debug(response);
 
@@ -79,7 +92,12 @@ export class AppService {
     request: ReferralRequest,
     session: Record<string, any>,
   ): Promise<Observable<{ data: ReferralResponse }>> {
-    const systemPrompt = await this.selectSystemPrompt(request);
+    const systemPrompt: string = await this.selectSystemPrompt(request);
+    const colorPromise: Promise<Record<string, string>> =
+      this.colorAiService.retrieveFilledTemplate(
+        'hypothyroidism',
+        request.clinicalNotes,
+      );
     const llmResponseObservable: Observable<ReferralResponse> =
       this.queryLLMStreamed<ReferralResponse>(
         systemPrompt,
@@ -92,8 +110,15 @@ export class AppService {
 
     return new Observable((subscriber) => {
       let accumulatedResponse: ReferralResponse = new ReferralResponse();
+      let populatedTemplate: Record<string, string>[];
       llmResponseObservable.subscribe({
         next: (next: ReferralResponse) => {
+          populatedTemplate = next.populatedTemplate;
+          next.populatedTemplate = [];
+          if (JSON.stringify(next) == JSON.stringify(accumulatedResponse)) {
+            // we don't want to return the same response - can happen if LLM is filling only populated template for now
+            return;
+          }
           accumulatedResponse = next;
           session[SessionKeys.REFERRAL_RESPONSE] = accumulatedResponse;
 
@@ -108,6 +133,18 @@ export class AppService {
           subscriber.error(reason);
         },
         complete: () => {
+          colorPromise
+            .then((filledTemplate) => {
+              accumulatedResponse.populatedTemplate = [filledTemplate];
+            })
+            .catch((reason) => {
+              this.logger.error(
+                'error querying Color API, will use filled template from LLM: ',
+                reason,
+              );
+              accumulatedResponse.populatedTemplate = populatedTemplate;
+            });
+
           this.queryPathwayStreamed(request, accumulatedResponse)
             .pipe(
               map((specialistAIResponse: SpecialistAIResponse) => {
@@ -310,10 +347,9 @@ export class AppService {
     );
   }
 
-  private async selectSystemPrompt(request: ReferralRequest) {
-    const bestTemplate = await this.templateSelectorService.selectBestTemplate(
-      request.question,
-    );
+  private async selectSystemPrompt(request: ReferralRequest): Promise<string> {
+    const bestTemplate: string =
+      await this.templateSelectorService.selectBestTemplate(request.question);
     this.logger.debug('bestTemplate', bestTemplate);
 
     if (bestTemplate) {
