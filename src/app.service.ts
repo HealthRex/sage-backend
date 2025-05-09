@@ -143,25 +143,28 @@ export class AppService {
                 reason,
               );
               accumulatedResponse.populatedTemplate = populatedTemplate;
-            });
-
-          this.queryPathwayStreamed(request, accumulatedResponse)
-            .pipe(
-              map((specialistAIResponse: SpecialistAIResponse) => {
-                accumulatedResponse.specialistAIResponse = specialistAIResponse;
-                return accumulatedResponse;
-              }),
-            )
-            .subscribe({
-              next: (next: ReferralResponse) => {
-                session[SessionKeys.REFERRAL_RESPONSE] = next;
-                subscriber.next({ data: next });
-              },
-              complete: () => subscriber.complete(),
-              error: (reason) => {
-                this.logger.error('error querying LLM: ', reason);
-                subscriber.error(reason);
-              },
+            })
+            .finally(() => {
+              subscriber.next({ data: accumulatedResponse });
+              this.queryPathwayStreamed(request, accumulatedResponse)
+                .pipe(
+                  map((specialistAIResponse: SpecialistAIResponse) => {
+                    accumulatedResponse.specialistAIResponse =
+                      specialistAIResponse;
+                    return accumulatedResponse;
+                  }),
+                )
+                .subscribe({
+                  next: (next: ReferralResponse) => {
+                    session[SessionKeys.REFERRAL_RESPONSE] = next;
+                    subscriber.next({ data: next });
+                  },
+                  complete: () => subscriber.complete(),
+                  error: (reason) => {
+                    this.logger.error('error querying LLM: ', reason);
+                    subscriber.error(reason);
+                  },
+                });
             });
         },
       });
