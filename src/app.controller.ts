@@ -126,9 +126,9 @@ export class AppController {
   }
 
   @Get('/followup-questions')
-  @ApiCreatedResponse({
+  @ApiOkResponse({
     description: 'Successfully generated followup questions from LLM.',
-    type: 'string',
+    type: String,
     isArray: true,
   })
   generateFollowupQuestions(
