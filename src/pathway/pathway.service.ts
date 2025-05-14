@@ -9,6 +9,10 @@ import { AnswersResponse } from './models/answersResponse';
 import { Citation, SpecialistAIResponse } from '../models/specialistAIResponse';
 import EventSourceStream from '@server-sent-stream/web';
 import { ChatRequest } from '../models/chatRequest';
+import * as fs from 'node:fs';
+import { join } from 'path';
+
+const promptFilePath: string = './resources/pathway_prompt.md';
 
 @Injectable()
 export class PathwayService {
@@ -264,22 +268,14 @@ export class PathwayService {
   ): AnswersRequest {
     const request: AnswersRequest = new AnswersRequest([], shouldStream);
 
-    let combinedMessage =
-      'Clinical question: ' +
-      clinicalQuestion +
-      '\n Clinical notes: ' +
-      clinicalNotes +
-      '\n Additional information: ';
+    const promptTemplate: string = fs
+      .readFileSync(join(process.cwd(), promptFilePath))
+      .toString()
+      .replace('{{question}}', clinicalQuestion)
+      // TODO originally, this should be populated template, but since we're still not generating correct populated template, use clinical notes for now
+      .replace('{{notes}}', clinicalNotes);
 
-    for (const filledTemplateField of filledTemplate) {
-      combinedMessage +=
-        filledTemplateField['field'] +
-        ': ' +
-        filledTemplateField['value'] +
-        '\n';
-    }
-
-    request.messages.push(new Message('user', combinedMessage));
+    request.messages.push(new Message('user', promptTemplate));
 
     this.logger.debug('Pathway API request: ', request);
     return request;
