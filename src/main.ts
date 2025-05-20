@@ -45,10 +45,14 @@ async function bootstrap() {
   );
 
   // config CORS
+  const allowedOrigins: string[] = process.env.CORS_ORIGINS?.split(',') || [];
+
   app.enableCors({
-    origin: '*', // TODO Allow only frontend origin
+    origin: allowedOrigins,
     methods: ['GET', 'POST'],
-    allowedHeaders: ['Content-Type'],
+    allowedHeaders: ['Content-Type', 'Set-Cookie'],
+    exposeHeaders: ['Set-Cookie'],
+    credentials: true,
   });
 
   // config Swagger
