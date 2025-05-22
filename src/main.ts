@@ -39,7 +39,11 @@ async function bootstrap() {
       // TODO might need to pass string[] here to be able to regularly change session secrets
       secret: process.env.SESSION_SECRET as string,
       resave: false,
-      cookie: { maxAge: 30 * 24 * 60 * 60 * 1000 }, // 30 days
+      cookie: {
+        sameSite: 'none',
+        secure: false,
+        maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
+      },
       saveUninitialized: false,
     }),
   );
