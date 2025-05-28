@@ -7,5 +7,5 @@ export class AnswersRequest {
     public stream: boolean = false,
   ) {}
 
-  model: string = 'pathway-v7-1';
+  model: string = process.env.PATHWAY_MODEL as string;
 }
