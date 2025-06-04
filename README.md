@@ -1,27 +1,27 @@
-# assist-pc-backend
+# sage-backend
 
 ## Docker Commands
 
 ### Using Docker Compose (Recommended)
 
-#### Run the application with PostgreSQL
+#### Run the application (with PostgreSQL)
 ```bash
-docker-compose up -d
+docker compose up -d
 ```
 
 #### Stop the application
 ```bash
-docker-compose down
+docker compose down
 ```
 
 #### View logs
 ```bash
-docker-compose logs -f
+docker compose logs -f
 ```
 
 #### Rebuild and restart
 ```bash
-docker-compose up --build -d
+docker compose up --build -d
 ```
 
 ### Using Docker directly
