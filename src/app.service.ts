@@ -58,13 +58,17 @@ export class AppService {
     request: ReferralRequest,
   ): Promise<ReferralResponse> {
     const systemPrompt = await this.selectSystemPrompt(request);
+    const bestTemplate: string =
+      await this.templateSelectorService.selectBestTemplate(request.question);
+
     const llmResponse = await this.queryLLM<LLMResponse>(
       systemPrompt,
       [
         'Clinical question: ' + request.question,
         'Patient notes: ' + request.clinicalNotes,
+        bestTemplate,
       ],
-      llmResponseSchema,
+      llmResponseSchema(JSON.parse(bestTemplate)),
     );
     const pathwayResponse = await this.queryPathway(request, llmResponse);
     const response: ReferralResponse = llmResponse as ReferralResponse;
@@ -87,7 +91,7 @@ export class AppService {
           'Clinical question: ' + request.question,
           'Patient notes: ' + request.clinicalNotes,
         ],
-        llmResponseSchema,
+        llmResponseSchema({}),
       );
 
     return new Observable((subscriber) => {
@@ -310,10 +314,9 @@ export class AppService {
     );
   }
 
-  private async selectSystemPrompt(request: ReferralRequest) {
-    const bestTemplate = await this.templateSelectorService.selectBestTemplate(
-      request.question,
-    );
+  private async selectSystemPrompt(request: ReferralRequest): Promise<string> {
+    const bestTemplate: string =
+      await this.templateSelectorService.selectBestTemplate(request.question);
     this.logger.debug('bestTemplate', bestTemplate);
 
     if (bestTemplate) {

@@ -5,6 +5,8 @@ import { catchError, lastValueFrom, map, of } from 'rxjs';
 import { SelectBestTemplateRequest } from './models/selectBestTemplateRequest';
 import { SelectBestTemplateResponse } from './models/selectBestTemplateResponse';
 import { plainToInstance } from 'class-transformer';
+import * as fs from 'node:fs';
+import { join } from 'path';
 
 // TODO would passing drive.google.com/file/.../view link work as well?
 const templateGoogleDocLinks: { [key: string]: string } = {
@@ -58,6 +60,10 @@ const templateGoogleDocLinks: { [key: string]: string } = {
     'https://drive.google.com/file/d/1dX80rZgPpzZGMbhdjpqBsHhCJkM3NInS/view',
 };
 
+// TODO temporary - remove after Embeddings API starts returning JSON templates
+const jsonTemplateFilePath: string =
+  './resources/templates/endocrinology/endocrinology_hypothyroidism.json';
+
 @Injectable()
 export class TemplateSelectorService {
   private readonly logger = new Logger(TemplateSelectorService.name);
@@ -65,6 +71,15 @@ export class TemplateSelectorService {
   constructor(private readonly httpService: HttpService) {}
 
   async selectBestTemplate(clinicalQuestion: string): Promise<string> {
+    console.log(join(process.cwd(), jsonTemplateFilePath));
+    const jsonTemplate: string = fs
+      .readFileSync(join(process.cwd(), jsonTemplateFilePath))
+      .toString();
+
+    return Promise.resolve(jsonTemplate);
+  }
+
+  async selectBestTemplate2(clinicalQuestion: string): Promise<string> {
     const request: SelectBestTemplateRequest = new SelectBestTemplateRequest();
     request.question = clinicalQuestion;
 
