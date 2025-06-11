@@ -6,9 +6,9 @@ Given:
 3. Stanford JSON template
 Generate JSON object with the following fields:
 - Field: specialistSummary (3-4 lines):
-  - Patient demographics and key clinical context
-  - Relevant history/findings
-  - Focus on findings that impact management
+  - Summary of the relevant case details for a specialist who is reviewing the case
+  - Focus on patient demographics and key clinical context, relevant history/findings, especially findings that impact management
+  - Summarize existing data only; do not include recommendations or suggestions
 - Field: populatedTemplate:
   - Populate "***" values of Stanford JSON template with case-specified information
   - Strictly follow input Stanford JSON format
