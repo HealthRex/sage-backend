@@ -9,6 +9,11 @@ Generate JSON object with the following fields:
   - Summary of the relevant case details for a specialist who is reviewing the case
   - Focus on patient demographics and key clinical context, relevant history/findings, especially findings that impact management
   - Summarize existing data only; do not include recommendations or suggestions
+- Field: basicPatientSummary (return as array):
+  - Patient age
+  - Patient gender
+  - Comma separated string of past medical history
+  - Comma separated string of key medications
 - Field: populatedTemplate:
   - Populate "***" values of Stanford JSON template with case-specified information
   - Strictly follow input Stanford JSON format
