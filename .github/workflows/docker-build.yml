@@ -31,5 +31,8 @@ jobs:
     - name: Test Docker image
       run: |
         docker run --rm -d --name sage-backend-test -p 3001:3000 sage-backend:latest
+
+    - name: Show Docker logs
+      run: |
         docker logs --follow sage-backend-test --until=10s
         docker stop sage-backend-test
