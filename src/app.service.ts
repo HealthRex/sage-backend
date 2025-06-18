@@ -57,24 +57,26 @@ export class AppService {
   async postReferralQuestion(
     request: ReferralRequest,
   ): Promise<ReferralResponse> {
-    const systemPrompt = await this.selectSystemPrompt(request);
     const bestTemplate: string =
       await this.templateSelectorService.selectBestTemplate(request.question);
+    const systemPrompt: string = this.selectSystemPrompt(bestTemplate);
 
-    const llmResponse = await this.queryLLM<LLMResponse>(
+    const llmResponse: LLMResponse = await this.queryLLM<LLMResponse>(
       systemPrompt,
       [
         'Clinical question: ' + request.question,
         'Patient notes: ' + request.clinicalNotes,
-        bestTemplate,
       ],
       llmResponseSchema(JSON.parse(bestTemplate)),
     );
-    const pathwayResponse = await this.queryPathway(request, llmResponse);
+    const pathwayResponse: SpecialistAIResponse = await this.queryPathway(
+      request,
+      llmResponse,
+    );
     const response: ReferralResponse = llmResponse as ReferralResponse;
     response.specialistAIResponse = pathwayResponse;
 
-    this.logger.debug(response);
+    this.logger.debug(JSON.stringify(response, null, 2));
 
     return response;
   }
@@ -83,7 +85,9 @@ export class AppService {
     request: ReferralRequest,
     session: Record<string, any>,
   ): Promise<Observable<{ data: ReferralResponse }>> {
-    const systemPrompt = await this.selectSystemPrompt(request);
+    const bestTemplate: string =
+      await this.templateSelectorService.selectBestTemplate(request.question);
+    const systemPrompt: string = this.selectSystemPrompt(bestTemplate);
     const llmResponseObservable: Observable<ReferralResponse> =
       this.queryLLMStreamed<ReferralResponse>(
         systemPrompt,
@@ -91,7 +95,7 @@ export class AppService {
           'Clinical question: ' + request.question,
           'Patient notes: ' + request.clinicalNotes,
         ],
-        llmResponseSchema({}),
+        llmResponseSchema(JSON.parse(bestTemplate)),
       );
 
     return new Observable((subscriber) => {
@@ -104,7 +108,7 @@ export class AppService {
           // reset Pathway conversation history on new referral request
           session[SessionKeys.PREVIOUS_PATHWAY_CONVERSATIONS] = [];
 
-          this.logger.debug('LLM partial response: ', next);
+          this.logger.debug('LLM partial response: ', JSON.stringify(next));
           subscriber.next({ data: next });
         },
         error: (reason) => {
@@ -231,6 +235,19 @@ export class AppService {
     return this.queryLLM<string[]>(systemPrompt, request, responseSchema);
   }
 
+  private selectSystemPrompt(bestTemplate: string) {
+    if (bestTemplate.length > 0) {
+      return fs
+        .readFileSync(join(process.cwd(), systemPromptFilePath))
+        .toString();
+    } else {
+      // no template selected
+      return fs
+        .readFileSync(join(process.cwd(), systemPromptWithoutTemplatesFilePath))
+        .toString();
+    }
+  }
+
   private async queryLLM<T>(
     systemPrompt: string,
     messages: string[],
@@ -312,24 +329,6 @@ export class AppService {
       request.clinicalNotes,
       response.populatedTemplate,
     );
-  }
-
-  private async selectSystemPrompt(request: ReferralRequest): Promise<string> {
-    const bestTemplate: string =
-      await this.templateSelectorService.selectBestTemplate(request.question);
-    this.logger.debug('bestTemplate', bestTemplate);
-
-    if (bestTemplate) {
-      return fs
-        .readFileSync(join(process.cwd(), systemPromptFilePath))
-        .toString()
-        .replace('{{TemplateGoogleDocLink}}', bestTemplate);
-    } else {
-      // no template selected
-      return fs
-        .readFileSync(join(process.cwd(), systemPromptWithoutTemplatesFilePath))
-        .toString();
-    }
   }
 
   private selectModel(): LanguageModelV1 {
