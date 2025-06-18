@@ -8,6 +8,9 @@ export class LLMResponse {
   @ApiProperty({ description: 'Template selection process explanation' })
   templateSelectionProcess: string;
 
+  @ApiProperty({ description: 'Basic patient summary' })
+  basicPatientSummary: Record<string, string>[];
+
   @ApiProperty({
     description: 'Populated template',
     type: 'array',
@@ -24,6 +27,9 @@ export class LLMResponse {
 export const llmResponseSchema = z.object({
   specialistSummary: z.string(),
   templateSelectionProcess: z.string(),
+  basicPatientSummary: z.array(
+    z.object({ field: z.string(), value: z.string() }),
+  ),
   populatedTemplate: z.array(
     z.object({ field: z.string(), value: z.string() }),
   ),
