@@ -22,4 +22,5 @@ EXPOSE 3000
 
 ## Command to run the application
 ENV NODE_ENV=production
-CMD ["node", "dist/src/main"]
+#CMD ["node", "dist/src/main"]
+CMD ls -lR /usr/src/app
