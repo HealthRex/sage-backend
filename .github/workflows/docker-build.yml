@@ -1,0 +1,36 @@
+name: Build Docker Image
+
+on:
+  push:
+    branches: [ main, docker-compose ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Build Docker image
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        file: ./Dockerfile
+        push: false
+        load: true
+        tags: sage-backend:latest
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
+    - name: Test Docker image
+      run: |
+        set -x
+        docker run --rm -d --name sage-backend-test -p 3001:3000 sage-backend:latest
+        sleep 10
+        docker logs --follow --until=10s sage-backend-test

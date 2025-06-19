@@ -1,0 +1,35 @@
+services:
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: sage_backend
+      POSTGRES_USER: sage_user
+      POSTGRES_PASSWORD: sage_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sage_user -d sage_backend"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  app:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      PG_HOST: postgres
+      PG_DATABASE: sage_backend
+      PG_USER: sage_user
+      PG_PASSWORD: sage_password
+      SESSION_SECRET: your-session-secret-here
+      NODE_ENV: production
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
