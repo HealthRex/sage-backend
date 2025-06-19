@@ -22,5 +22,5 @@ EXPOSE 3000
 
 ## Command to run the application
 ENV NODE_ENV=production
-#CMD ["node", "dist/src/main"]
-CMD ls -lR /usr/src/app
+# TODO sometimes main.js is in /dist/src and sometimes it's in /dist - using find for now, but need to figure this out
+CMD node `find ./dist -name main.js`
