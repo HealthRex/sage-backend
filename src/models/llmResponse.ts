@@ -1,5 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { z } from 'zod';
+import { jsonToZod } from '../validation/jsonToZodSchema';
 
 export class LLMResponse {
   @ApiProperty({ description: 'Specialist summary response' })
@@ -24,13 +25,14 @@ export class LLMResponse {
   populatedTemplate: Record<string, string>[];
 }
 
-export const llmResponseSchema = z.object({
-  specialistSummary: z.string(),
-  templateSelectionProcess: z.string(),
-  basicPatientSummary: z.array(
-    z.object({ field: z.string(), value: z.string() }),
-  ),
-  populatedTemplate: z.array(
-    z.object({ field: z.string(), value: z.string() }),
-  ),
-});
+export const llmResponseSchema = (
+  templateJson: any,
+): z.ZodObject<any, any, any, any, any> => {
+  return z.object({
+    specialistSummary: z.string(),
+    basicPatientSummary: z.array(
+      z.object({ field: z.string(), value: z.string() }),
+    ),
+    populatedTemplate: jsonToZod(templateJson),
+  });
+};
