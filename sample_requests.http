@@ -1,32 +1,24 @@
 ### Gemini followup questions
-POST http://localhost:3000/followup-questions
-Content-Type: application/json
-
-[
-  "Clinical question: 42F with history of SLE and proteinuria. Nephrology consult recommends mycophenolate + ACEi.",
-  "LLM-generated specialist response: Recommend mycophenolate mofetil 1g BID and continue lisinopril. Monitor renal function and proteinuria monthly. Consider biopsy if creatinine worsens or proteinuria increases despite treatment."
-]
+GET {{assist-pc-backend-url}}/followup-questions
 
 ### Pathway chatbot question
-POST http://localhost:3000/ask-pathway
+POST {{assist-pc-backend-url}}/ask-pathway
 Content-Type: application/json
 
-[
-  "37F with fatigue and trembling spells, found to have low T4 (3.1) but normal TSH (0.62). On multiple medications including stanozolol and digoxin. Would appreciate guidance on interpretation of thyroid function tests and recommended next steps in evaluation",
-  "HISTORY OF PRESENT ILLNESS\nA 37-year-old white female is referred by her family physician for thyroid evaluation.\nShe has complained of trembling spells associated with feeling hot and flushed for 3 months.\nShe has noted tiredness and lack of energy for 4 months.\nHer weight has been stable during this time.\nChronic constipation has been worse recently.\nPAST MEDICAL HISTORY\nThere is no history of a goiter.\nShe has a history of chronic constipation.\nPast medical history indicates a previous hysterectomy and cholecystectomy 11 years ago,\nhereditary angioedema and a recent history of hypercholesterolemia.\nMEDICATIONS\nHer medications include 400 mg ibuprofen 3 times daily, 0.25 mg digoxin daily,\nstool softener twice daily and 2 mg stanozolol daily for angioedema.\nFAMILY HISTORY\nThere is no family history of thyroid disease.\nPHYSICAL EXAMINATION\nPhysical examination shows an obese white female who is 160 cm tall and weighs 87.7 kg.\nBlood pressure is 148/90 mmHg.\nPulse is 84/min and regular.\nShe has increased hair on her face, abdomen, arms and lower back.\nThe remainder of the physical examination is normal.\nShe does not have a goiter and her deep tendon reflexes are normal.\nLABORATORY AND OTHER PROCEDURES\nLaboratory results recently obtained by her physician included the following:\nCBC showed HCT 39%; WBC 6700/mm3 with a normal differential.\nUrinalysis showed a specific gravity of 1.005, pH 6.0, negative for glucose, protein and blood.\nChemistry profile results were as follows: Albumin 4.3 g/dL; globulins 2.4 g/dL, Ca 9.3 mg/dL; Phosphate 3.2 mmHg;\nbilirubin 0.3 mg/dL; alkaline phosphatase 90 IU/L; SGOT 33 U/L; SGPT 52 U/L; Na 143 mEq/L; K 3.9 mEq/L;\nCl 107 mEq/L;C02 24 mEq/L; BUN 12 mg/dL; Creatinine 1.0 mg/dL; Cholesterol 187 mg/dL;\n  triglycerides 312 mg/dL and glucose 117 mg/dL.\nSerum thyroxine-↓3.1 μg/dL, T3 uptake-↑56%, free thyroxine index-1.7, serum triiodothyronine- 67 ng/dL, TSH 0.62 μIU/mL."
-]
+{
+  "question": "What further procedures would you recommend?"
+}
 
 ### Pathway chatbot question streamed
-POST http://localhost:3000/ask-pathway-streamed
+POST {{assist-pc-backend-url}}/ask-pathway-streamed
 Content-Type: application/json
 
-[
-  "I have a 68-year-old male with persistent microcytic anemia. Hgb 9.8 g/dL, MCV 76. Iron studies show low ferritin (15 ng/mL) despite no evidence of overt bleeding. He has intermittent epigastric pain. Is endoscopic evaluation indicated before iron supplementation or can we start iron and monitor response?",
-  "SUBJECTIVE: 68yo M returns for follow-up of anemia. First noted 3 months ago. Denies any visible blood in stool or melena. Reports occasional epigastric discomfort, worse with spicy foods, better with OTC antacids. No NSAID use. No weight loss, night sweats, or fatigue. Last colonoscopy 8 years ago was normal. No family history of GI malignancy. \n\n  OBJECTIVE:\n  Vitals: BP 132/78, HR 88, Weight stable at 78kg\n  CBC: Hgb 9.8 g/dL (was 10.2 g/dL 3 months ago, 13.8 g/dL 1 year ago)\n  MCV 76 fL (80-100)\n  WBC 7.2, Platelets 245\n  Iron studies: Ferritin 15 ng/mL (30-400), Transferrin saturation 8% (15-50%)\n  TIBC 410 mcg/dL (250-370)\n  Reticulocyte count 1.1%\n  Fecal occult blood testing: Negative x3\n\n  ASSESSMENT/PLAN: Microcytic anemia, likely iron deficiency. Consider GI workup vs empiric iron supplementation. Will discuss with patient."
-]
+{
+  "question": "Understood. Any other diagnoses?"
+}
 
 ### Clinical question with matched template streamed
-POST http://localhost:3000/referral-streamed
+POST {{assist-pc-backend-url}}/referral-streamed
 Content-Type: application/json
 
 {
@@ -35,7 +27,7 @@ Content-Type: application/json
 }
 
 ### Clinical question with matched template
-POST http://localhost:3000/referral
+POST {{assist-pc-backend-url}}/referral
 Content-Type: application/json
 
 {
@@ -44,7 +36,7 @@ Content-Type: application/json
 }
 
 ### Clinical question without matched template
-POST http://localhost:3000/referral
+POST {{assist-pc-backend-url}}/referral
 Content-Type: application/json
 
 {
@@ -53,7 +45,7 @@ Content-Type: application/json
 }
 
 ### Clinical question without matched template streamed
-POST http://localhost:3000/referral-streamed
+POST {{assist-pc-backend-url}}/referral-streamed
 Content-Type: application/json
 
 {
@@ -61,26 +53,8 @@ Content-Type: application/json
   "clinicalNotes": "SUBJECTIVE: 68yo M returns for follow-up of anemia. First noted 3 months ago. Denies any visible blood in stool or melena. Reports occasional epigastric discomfort, worse with spicy foods, better with OTC antacids. No NSAID use. No weight loss, night sweats, or fatigue. Last colonoscopy 8 years ago was normal. No family history of GI malignancy. \n\n  OBJECTIVE:\n  Vitals: BP 132/78, HR 88, Weight stable at 78kg\n  CBC: Hgb 9.8 g/dL (was 10.2 g/dL 3 months ago, 13.8 g/dL 1 year ago)\n  MCV 76 fL (80-100)\n  WBC 7.2, Platelets 245\n  Iron studies: Ferritin 15 ng/mL (30-400), Transferrin saturation 8% (15-50%)\n  TIBC 410 mcg/dL (250-370)\n  Reticulocyte count 1.1%\n  Fecal occult blood testing: Negative x3\n\n  ASSESSMENT/PLAN: Microcytic anemia, likely iron deficiency. Consider GI workup vs empiric iron supplementation. Will discuss with patient."
 }
 
-### Remote clinical question with matched template
-POST https://assist-pc-backend.onrender.com/referral
-Content-Type: application/json
-
-{
-  "question": "37F with fatigue and trembling spells, found to have low T4 (3.1) but normal TSH (0.62). On multiple medications including stanozolol and digoxin. Would appreciate guidance on interpretation of thyroid function tests and recommended next steps in evaluation",
-  "clinicalNotes": "HISTORY OF PRESENT ILLNESS\nA 37-year-old white female is referred by her family physician for thyroid evaluation.\nShe has complained of trembling spells associated with feeling hot and flushed for 3 months.\nShe has noted tiredness and lack of energy for 4 months.\nHer weight has been stable during this time.\nChronic constipation has been worse recently.\nPAST MEDICAL HISTORY\nThere is no history of a goiter.\nShe has a history of chronic constipation.\nPast medical history indicates a previous hysterectomy and cholecystectomy 11 years ago,\nhereditary angioedema and a recent history of hypercholesterolemia.\nMEDICATIONS\nHer medications include 400 mg ibuprofen 3 times daily, 0.25 mg digoxin daily,\nstool softener twice daily and 2 mg stanozolol daily for angioedema.\nFAMILY HISTORY\nThere is no family history of thyroid disease.\nPHYSICAL EXAMINATION\nPhysical examination shows an obese white female who is 160 cm tall and weighs 87.7 kg.\nBlood pressure is 148/90 mmHg.\nPulse is 84/min and regular.\nShe has increased hair on her face, abdomen, arms and lower back.\nThe remainder of the physical examination is normal.\nShe does not have a goiter and her deep tendon reflexes are normal.\nLABORATORY AND OTHER PROCEDURES\nLaboratory results recently obtained by her physician included the following:\nCBC showed HCT 39%; WBC 6700/mm3 with a normal differential.\nUrinalysis showed a specific gravity of 1.005, pH 6.0, negative for glucose, protein and blood.\nChemistry profile results were as follows: Albumin 4.3 g/dL; globulins 2.4 g/dL, Ca 9.3 mg/dL; Phosphate 3.2 mmHg;\nbilirubin 0.3 mg/dL; alkaline phosphatase 90 IU/L; SGOT 33 U/L; SGPT 52 U/L; Na 143 mEq/L; K 3.9 mEq/L;\nCl 107 mEq/L;C02 24 mEq/L; BUN 12 mg/dL; Creatinine 1.0 mg/dL; Cholesterol 187 mg/dL;\n  triglycerides 312 mg/dL and glucose 117 mg/dL.\nSerum thyroxine-↓3.1 μg/dL, T3 uptake-↑56%, free thyroxine index-1.7, serum triiodothyronine- 67 ng/dL, TSH 0.62 μIU/mL."
-}
-
-### Remote clinical question with matched template streamed
-POST https://assist-pc-backend.onrender.com/referral-streamed
-Content-Type: application/json
-
-{
-  "question": "37F with fatigue and trembling spells, found to have low T4 (3.1) but normal TSH (0.62). On multiple medications including stanozolol and digoxin. Would appreciate guidance on interpretation of thyroid function tests and recommended next steps in evaluation",
-  "clinicalNotes": "HISTORY OF PRESENT ILLNESS\nA 37-year-old white female is referred by her family physician for thyroid evaluation.\nShe has complained of trembling spells associated with feeling hot and flushed for 3 months.\nShe has noted tiredness and lack of energy for 4 months.\nHer weight has been stable during this time.\nChronic constipation has been worse recently.\nPAST MEDICAL HISTORY\nThere is no history of a goiter.\nShe has a history of chronic constipation.\nPast medical history indicates a previous hysterectomy and cholecystectomy 11 years ago,\nhereditary angioedema and a recent history of hypercholesterolemia.\nMEDICATIONS\nHer medications include 400 mg ibuprofen 3 times daily, 0.25 mg digoxin daily,\nstool softener twice daily and 2 mg stanozolol daily for angioedema.\nFAMILY HISTORY\nThere is no family history of thyroid disease.\nPHYSICAL EXAMINATION\nPhysical examination shows an obese white female who is 160 cm tall and weighs 87.7 kg.\nBlood pressure is 148/90 mmHg.\nPulse is 84/min and regular.\nShe has increased hair on her face, abdomen, arms and lower back.\nThe remainder of the physical examination is normal.\nShe does not have a goiter and her deep tendon reflexes are normal.\nLABORATORY AND OTHER PROCEDURES\nLaboratory results recently obtained by her physician included the following:\nCBC showed HCT 39%; WBC 6700/mm3 with a normal differential.\nUrinalysis showed a specific gravity of 1.005, pH 6.0, negative for glucose, protein and blood.\nChemistry profile results were as follows: Albumin 4.3 g/dL; globulins 2.4 g/dL, Ca 9.3 mg/dL; Phosphate 3.2 mmHg;\nbilirubin 0.3 mg/dL; alkaline phosphatase 90 IU/L; SGOT 33 U/L; SGPT 52 U/L; Na 143 mEq/L; K 3.9 mEq/L;\nCl 107 mEq/L;C02 24 mEq/L; BUN 12 mg/dL; Creatinine 1.0 mg/dL; Cholesterol 187 mg/dL;\n  triglycerides 312 mg/dL and glucose 117 mg/dL.\nSerum thyroxine-↓3.1 μg/dL, T3 uptake-↑56%, free thyroxine index-1.7, serum triiodothyronine- 67 ng/dL, TSH 0.62 μIU/mL."
-}
-
 ### Remote clinical question with bad question
-POST https://assist-pc-backend.onrender.com/referral-streamed
+POST {{assist-pc-backend-url}}/referral-streamed
 Content-Type: application/json
 
 {
