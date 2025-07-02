@@ -1,6 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { SpecialistAIResponse } from './specialistAIResponse';
 import { LLMResponse } from './llmResponse';
+import { GetOrdersResponse } from '../recommender/models/getOrdersResponse';
 
 // {
 //   "specialistSummary": string,
@@ -11,4 +12,7 @@ import { LLMResponse } from './llmResponse';
 export class ReferralResponse extends LLMResponse {
   @ApiProperty({ description: 'Specialist AI response' })
   specialistAIResponse?: SpecialistAIResponse;
+
+  @ApiProperty({ description: 'Recommender API response' })
+  recommenderResponse?: GetOrdersResponse;
 }

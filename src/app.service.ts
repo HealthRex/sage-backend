@@ -18,12 +18,17 @@ import { ReferralResponse } from './models/referralResponse';
 import { TemplateSelectorService } from './template-selector/template-selector.service';
 import { PathwayService } from './pathway/pathway.service';
 import { SpecialistAIResponse } from './models/specialistAIResponse';
-import { map, Observable, tap } from 'rxjs';
-import { fromReadableStreamLike } from 'rxjs/internal/observable/innerFrom';
+import { map, merge, Observable, tap } from 'rxjs';
+import {
+  fromPromise,
+  fromReadableStreamLike,
+} from 'rxjs/internal/observable/innerFrom';
 import { LLMResponse, llmResponseSchema } from './models/llmResponse';
 import { z } from 'zod';
 import { ChatRequest } from './models/chatRequest';
 import { SessionKeys } from './const';
+import { RecommenderService } from './recommender/recommender.service';
+import { GetOrdersResponse } from './recommender/models/getOrdersResponse';
 
 enum AIProvider {
   Claude = 'CLAUDE',
@@ -48,6 +53,7 @@ export class AppService {
   constructor(
     private readonly templateSelectorService: TemplateSelectorService,
     private readonly pathwayService: PathwayService,
+    private readonly recommenderService: RecommenderService,
   ) {}
 
   getRoot(): string {
@@ -57,6 +63,12 @@ export class AppService {
   async postReferralQuestion(
     request: ReferralRequest,
   ): Promise<ReferralResponse> {
+    const recommenderResponsePromise =
+      this.recommenderService.retrieveRecommendations(
+        request.question,
+        request.clinicalNotes,
+      );
+
     const bestTemplate: string =
       await this.templateSelectorService.selectBestTemplate(request.question);
     const systemPrompt: string = this.selectSystemPrompt(bestTemplate);
@@ -75,6 +87,11 @@ export class AppService {
     );
     const response: ReferralResponse = llmResponse as ReferralResponse;
     response.specialistAIResponse = pathwayResponse;
+    try {
+      response.recommenderResponse = await recommenderResponsePromise;
+    } catch (e) {
+      this.logger.warn('Recommender API requests failed, skipping: ', e);
+    }
 
     this.logger.debug(JSON.stringify(response, null, 2));
 
@@ -85,6 +102,12 @@ export class AppService {
     request: ReferralRequest,
     session: Record<string, any>,
   ): Promise<Observable<{ data: ReferralResponse }>> {
+    const recommenderResponsePromise =
+      this.recommenderService.retrieveRecommendations(
+        request.question,
+        request.clinicalNotes,
+      );
+
     const bestTemplate: string =
       await this.templateSelectorService.selectBestTemplate(request.question);
     const systemPrompt: string = this.selectSystemPrompt(bestTemplate);
@@ -116,24 +139,30 @@ export class AppService {
           subscriber.error(reason);
         },
         complete: () => {
-          this.queryPathwayStreamed(request, accumulatedResponse)
-            .pipe(
+          merge(
+            this.queryPathwayStreamed(request, accumulatedResponse).pipe(
               map((specialistAIResponse: SpecialistAIResponse) => {
                 accumulatedResponse.specialistAIResponse = specialistAIResponse;
                 return accumulatedResponse;
               }),
-            )
-            .subscribe({
-              next: (next: ReferralResponse) => {
-                session[SessionKeys.REFERRAL_RESPONSE] = next;
-                subscriber.next({ data: next });
-              },
-              complete: () => subscriber.complete(),
-              error: (reason) => {
-                this.logger.error('error querying LLM: ', reason);
-                subscriber.error(reason);
-              },
-            });
+            ),
+            fromPromise(recommenderResponsePromise).pipe(
+              map((getOrdersResponse: GetOrdersResponse) => {
+                accumulatedResponse.recommenderResponse = getOrdersResponse;
+                return accumulatedResponse;
+              }),
+            ),
+          ).subscribe({
+            next: (next: ReferralResponse) => {
+              session[SessionKeys.REFERRAL_RESPONSE] = next;
+              subscriber.next({ data: next });
+            },
+            complete: () => subscriber.complete(),
+            error: (reason) => {
+              this.logger.error('error querying LLM: ', reason);
+              subscriber.error(reason);
+            },
+          });
         },
       });
     });
