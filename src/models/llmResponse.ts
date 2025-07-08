@@ -26,10 +26,19 @@ export class LLMResponse {
 
   // TODO review this logic - try to come up with logic without needing to call this explicitly
   public postProcessedPopulatedTemplate(): object[] {
+    if (
+      this.populatedTemplate == null ||
+      !Array.isArray(this.populatedTemplate)
+    ) {
+      return this.populatedTemplate;
+    }
+
     // TODO not content with removing these things programmatically - we shouldn't be removing these at all - maybe ask FE dev to adapt the JSONs to the format he wants
     const result = new Array<object>();
     for (const templateItem of this.populatedTemplate) {
       if (
+        Object.keys(templateItem) &&
+        Object.keys(templateItem).length !== 0 &&
         !Object.keys(templateItem)[0]
           .toLowerCase()
           .startsWith('my clinical question') &&
