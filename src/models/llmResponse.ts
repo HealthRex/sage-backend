@@ -22,7 +22,62 @@ export class LLMResponse {
       },
     },
   })
-  populatedTemplate: Record<string, string>[];
+  populatedTemplate: object[];
+
+  // TODO review this logic - try to come up with logic without needing to call this explicitly
+  public postProcessedPopulatedTemplate(): object[] {
+    // TODO not content with removing these things programmatically - we shouldn't be removing these at all - maybe ask FE dev to adapt the JSONs to the format he wants
+    const result = new Array<object>();
+    for (const templateItem of this.populatedTemplate) {
+      if (
+        !Object.keys(templateItem)[0]
+          .toLowerCase()
+          .startsWith('my clinical question') &&
+        !Object.keys(templateItem)[0]
+          .toLowerCase()
+          .startsWith('my most current assessment')
+      ) {
+        result.push(templateItem);
+      }
+    }
+
+    return this.removeDuplicates(result) as Record<string, object>[];
+  }
+
+  // TODO review this logic - not sure if this works in all cases yet
+  private removeDuplicates(obj: object): object {
+    if (Array.isArray(obj)) {
+      const result = new Array<object>();
+      const seenKeys = new Set();
+      for (const arrayElem of obj) {
+        const elem = arrayElem as Record<string, any>;
+        const filteredElem: Record<string, any> = {};
+        for (const key of Object.keys(elem)) {
+          if (!seenKeys.has(key)) {
+            seenKeys.add(key);
+            filteredElem[key] = this.removeDuplicates(elem[key] as object);
+          }
+        }
+        if (Object.keys(filteredElem).length > 0) {
+          result.push(filteredElem);
+        }
+      }
+      return result;
+    } else if (typeof obj === 'object') {
+      const seenKeys = new Set();
+      const filteredElem: Record<string, any> = {};
+      for (const key of Object.keys(obj)) {
+        if (!seenKeys.has(key)) {
+          seenKeys.add(key);
+          const objAsRecord = obj as Record<string, object>;
+          filteredElem[key] = this.removeDuplicates(objAsRecord[key]);
+        }
+      }
+      return filteredElem;
+    } else {
+      return obj;
+    }
+  }
 }
 
 export const llmResponseSchema = (

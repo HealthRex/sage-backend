@@ -24,6 +24,7 @@ import { LLMResponse, llmResponseSchema } from './models/llmResponse';
 import { z } from 'zod';
 import { ChatRequest } from './models/chatRequest';
 import { SessionKeys } from './const';
+import { plainToInstance } from 'class-transformer';
 
 enum AIProvider {
   Claude = 'CLAUDE',
@@ -36,10 +37,6 @@ const systemPromptWithoutTemplatesFilePath: string =
   './resources/prompt_no_matched_templates.txt';
 const systemPromptFollowupQuestionsFilePath: string =
   './resources/prompt_followup_questions.txt';
-
-// const referralTemplateFileMimeType: string = 'application/pdf';
-// const referralTemplateFilePath: string =
-//   './resources/Endocrinology eConsult Checklists FINAL 4.19.22.docx.pdf';
 
 @Injectable()
 export class AppService {
@@ -61,7 +58,7 @@ export class AppService {
       await this.templateSelectorService.selectBestTemplate(request.question);
     const systemPrompt: string = this.selectSystemPrompt(bestTemplate);
 
-    const llmResponse: LLMResponse = await this.queryLLM<LLMResponse>(
+    let llmResponse: LLMResponse = await this.queryLLM<LLMResponse>(
       systemPrompt,
       [
         'Clinical question: ' + request.question,
@@ -69,6 +66,10 @@ export class AppService {
       ],
       llmResponseSchema(JSON.parse(bestTemplate)),
     );
+    // TODO refactor code so we don't need to call postProcess() here
+    llmResponse = plainToInstance(ReferralResponse, llmResponse);
+    llmResponse.populatedTemplate =
+      llmResponse.postProcessedPopulatedTemplate();
     const pathwayResponse: SpecialistAIResponse = await this.queryPathway(
       request,
       llmResponse,
@@ -102,6 +103,10 @@ export class AppService {
       let accumulatedResponse: ReferralResponse = new ReferralResponse();
       llmResponseObservable.subscribe({
         next: (next: ReferralResponse) => {
+          // TODO refactor code so we don't need to call postProcess() here
+          next = plainToInstance(ReferralResponse, next);
+          next.populatedTemplate = next.postProcessedPopulatedTemplate();
+
           accumulatedResponse = next;
           session[SessionKeys.REFERRAL_RESPONSE] = accumulatedResponse;
 

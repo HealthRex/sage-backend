@@ -23,7 +23,7 @@ export class PathwayService {
   async retrieveAnswer(
     clinicalQuestion: string,
     clinicalNotes: string,
-    filledTemplate: Record<string, string>[],
+    filledTemplate: object[],
   ): Promise<SpecialistAIResponse> {
     const request = this.prepareAnswersRequest(
       clinicalQuestion,
@@ -38,7 +38,7 @@ export class PathwayService {
   retrieveAnswerStreamed(
     clinicalQuestion: string,
     clinicalNotes: string,
-    filledTemplate: Record<string, string>[],
+    filledTemplate: object[],
   ): Observable<SpecialistAIResponse> {
     const request = this.prepareAnswersRequest(
       clinicalQuestion,
@@ -263,7 +263,7 @@ export class PathwayService {
   private prepareAnswersRequest(
     clinicalQuestion: string,
     clinicalNotes: string,
-    filledTemplate: Record<string, string>[],
+    filledTemplate: object[],
     shouldStream: boolean = false,
   ): AnswersRequest {
     const request: AnswersRequest = new AnswersRequest([], shouldStream);
