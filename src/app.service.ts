@@ -18,10 +18,13 @@ import { ReferralResponse } from './models/referralResponse';
 import { TemplateSelectorService } from './template-selector/template-selector.service';
 import { PathwayService } from './pathway/pathway.service';
 import { SpecialistAIResponse } from './models/specialistAIResponse';
-import { map, Observable } from 'rxjs';
+import { map, Observable, tap } from 'rxjs';
 import { fromReadableStreamLike } from 'rxjs/internal/observable/innerFrom';
 import { LLMResponse, llmResponseSchema } from './models/llmResponse';
 import { z } from 'zod';
+import { ChatRequest } from './models/chatRequest';
+import { SessionKeys } from './const';
+import { plainToInstance } from 'class-transformer';
 
 enum AIProvider {
   Claude = 'CLAUDE',
@@ -34,10 +37,6 @@ const systemPromptWithoutTemplatesFilePath: string =
   './resources/prompt_no_matched_templates.txt';
 const systemPromptFollowupQuestionsFilePath: string =
   './resources/prompt_followup_questions.txt';
-
-// const referralTemplateFileMimeType: string = 'application/pdf';
-// const referralTemplateFilePath: string =
-//   './resources/Endocrinology eConsult Checklists FINAL 4.19.22.docx.pdf';
 
 @Injectable()
 export class AppService {
@@ -55,28 +54,41 @@ export class AppService {
   async postReferralQuestion(
     request: ReferralRequest,
   ): Promise<ReferralResponse> {
-    const systemPrompt = await this.selectSystemPrompt(request);
-    const llmResponse = await this.queryLLM<LLMResponse>(
+    const bestTemplate: string =
+      await this.templateSelectorService.selectBestTemplate(request.question);
+    const systemPrompt: string = this.selectSystemPrompt(bestTemplate);
+
+    let llmResponse: LLMResponse = await this.queryLLM<LLMResponse>(
       systemPrompt,
       [
         'Clinical question: ' + request.question,
         'Patient notes: ' + request.clinicalNotes,
       ],
-      llmResponseSchema,
+      llmResponseSchema(JSON.parse(bestTemplate)),
     );
-    const pathwayResponse = await this.queryPathway(request, llmResponse);
+    // TODO refactor code so we don't need to call postProcess() here
+    llmResponse = plainToInstance(ReferralResponse, llmResponse);
+    llmResponse.populatedTemplate =
+      llmResponse.postProcessedPopulatedTemplate();
+    const pathwayResponse: SpecialistAIResponse = await this.queryPathway(
+      request,
+      llmResponse,
+    );
     const response: ReferralResponse = llmResponse as ReferralResponse;
     response.specialistAIResponse = pathwayResponse;
 
-    this.logger.debug(response);
+    this.logger.debug(JSON.stringify(response, null, 2));
 
     return response;
   }
 
   async postReferralQuestionStreamed(
     request: ReferralRequest,
+    session: Record<string, any>,
   ): Promise<Observable<{ data: ReferralResponse }>> {
-    const systemPrompt = await this.selectSystemPrompt(request);
+    const bestTemplate: string =
+      await this.templateSelectorService.selectBestTemplate(request.question);
+    const systemPrompt: string = this.selectSystemPrompt(bestTemplate);
     const llmResponseObservable: Observable<ReferralResponse> =
       this.queryLLMStreamed<ReferralResponse>(
         systemPrompt,
@@ -84,14 +96,24 @@ export class AppService {
           'Clinical question: ' + request.question,
           'Patient notes: ' + request.clinicalNotes,
         ],
-        llmResponseSchema,
+        llmResponseSchema(JSON.parse(bestTemplate)),
       );
 
     return new Observable((subscriber) => {
       let accumulatedResponse: ReferralResponse = new ReferralResponse();
       llmResponseObservable.subscribe({
         next: (next: ReferralResponse) => {
+          // TODO refactor code so we don't need to call postProcess() here
+          next = plainToInstance(ReferralResponse, next);
+          next.populatedTemplate = next.postProcessedPopulatedTemplate();
+
           accumulatedResponse = next;
+          session[SessionKeys.REFERRAL_RESPONSE] = accumulatedResponse;
+
+          // reset Pathway conversation history on new referral request
+          session[SessionKeys.PREVIOUS_PATHWAY_CONVERSATIONS] = [];
+
+          this.logger.debug('LLM partial response: ', JSON.stringify(next));
           subscriber.next({ data: next });
         },
         error: (reason) => {
@@ -108,6 +130,7 @@ export class AppService {
             )
             .subscribe({
               next: (next: ReferralResponse) => {
+                session[SessionKeys.REFERRAL_RESPONSE] = next;
                 subscriber.next({ data: next });
               },
               complete: () => subscriber.complete(),
@@ -121,27 +144,113 @@ export class AppService {
     });
   }
 
-  async postPathwayQuestion(request: string[]): Promise<SpecialistAIResponse> {
-    return this.pathwayService.retrieveChatAnswer(request);
+  async postPathwayQuestion(
+    request: string,
+    session: Record<string, any>,
+  ): Promise<SpecialistAIResponse> {
+    const chatRequest: ChatRequest = this.prepareChatRequest(session, request);
+    return this.pathwayService.retrieveChatAnswer(chatRequest);
   }
 
   postPathwayQuestionStreamed(
-    request: string[],
+    request: string,
+    session: Record<string, any>,
   ): Observable<{ data: SpecialistAIResponse }> {
-    return this.pathwayService.retrieveChatAnswerStreamed(request).pipe(
-      map((next) => {
-        return { data: next };
-      }),
-    );
+    const chatRequest: ChatRequest = this.prepareChatRequest(session, request);
+    let accumulatedResponse: SpecialistAIResponse;
+    return new Observable((subscriber) => {
+      this.pathwayService
+        .retrieveChatAnswerStreamed(chatRequest)
+        .pipe(
+          tap((next) => {
+            accumulatedResponse = next;
+          }),
+          map((next) => {
+            return { data: next };
+          }),
+        )
+        .subscribe({
+          next: (next) => {
+            subscriber.next(next);
+          },
+          complete: () => {
+            (
+              session[SessionKeys.PREVIOUS_PATHWAY_CONVERSATIONS] as Record<
+                string,
+                SpecialistAIResponse
+              >[]
+            ).push({
+              [request]: accumulatedResponse,
+            });
+            subscriber.complete();
+          },
+          error: (reason) => {
+            this.logger.error('error querying Pathway: ', reason, chatRequest);
+            subscriber.error(reason);
+          },
+        });
+    });
   }
 
-  generateFollowupQuestions(request: string[]): Promise<string[]> {
+  generateFollowupQuestions(session: Record<string, any>): Promise<string[]> {
     const systemPrompt = fs
       .readFileSync(join(process.cwd(), systemPromptFollowupQuestionsFilePath))
       .toString();
+
+    if (
+      session[SessionKeys.REFERRAL_REQUEST] == null ||
+      (session[SessionKeys.REFERRAL_REQUEST] as ReferralRequest).question ==
+        null ||
+      session[SessionKeys.REFERRAL_RESPONSE] == null ||
+      (session[SessionKeys.REFERRAL_RESPONSE] as ReferralResponse)
+        .specialistAIResponse == null ||
+      (session[SessionKeys.REFERRAL_RESPONSE] as ReferralResponse)
+        .specialistAIResponse?.summaryResponse == null
+    ) {
+      return Promise.reject(
+        new Error(
+          'either referralRequest (or its question field) or' +
+            ' referralResponse (or its specialistAIResponse field or its summaryResponse field) are empty',
+        ),
+      );
+    }
+
+    let lastPathwayResponse = (
+      session[SessionKeys.REFERRAL_RESPONSE] as ReferralResponse
+    ).specialistAIResponse?.summaryResponse;
+    if (session[SessionKeys.PREVIOUS_PATHWAY_CONVERSATIONS] != null) {
+      const lastPathwayConversation = (
+        session[SessionKeys.PREVIOUS_PATHWAY_CONVERSATIONS] as Record<
+          string,
+          SpecialistAIResponse
+        >[]
+      ).at(-1);
+      for (const question in lastPathwayConversation) {
+        lastPathwayResponse = lastPathwayConversation[question].summaryResponse;
+      }
+    }
+    const request = [
+      'Clinical question: ' +
+        (session[SessionKeys.REFERRAL_REQUEST] as ReferralRequest).question,
+      'LLM-generated specialist response: ' + lastPathwayResponse,
+    ];
+
     const responseSchema = z.string().array();
 
     return this.queryLLM<string[]>(systemPrompt, request, responseSchema);
+  }
+
+  private selectSystemPrompt(bestTemplate: string) {
+    if (bestTemplate.length > 0) {
+      return fs
+        .readFileSync(join(process.cwd(), systemPromptFilePath))
+        .toString();
+    } else {
+      // no template selected
+      return fs
+        .readFileSync(join(process.cwd(), systemPromptWithoutTemplatesFilePath))
+        .toString();
+    }
   }
 
   private async queryLLM<T>(
@@ -227,25 +336,6 @@ export class AppService {
     );
   }
 
-  private async selectSystemPrompt(request: ReferralRequest) {
-    const bestTemplate = await this.templateSelectorService.selectBestTemplate(
-      request.question,
-    );
-    this.logger.debug('bestTemplate', bestTemplate);
-
-    if (bestTemplate) {
-      return fs
-        .readFileSync(join(process.cwd(), systemPromptFilePath))
-        .toString()
-        .replace('{{TemplateGoogleDocLink}}', bestTemplate);
-    } else {
-      // no template selected
-      return fs
-        .readFileSync(join(process.cwd(), systemPromptWithoutTemplatesFilePath))
-        .toString();
-    }
-  }
-
   private selectModel(): LanguageModelV1 {
     switch (String(process.env.AI_PROVIDER).toUpperCase() as AIProvider) {
       case AIProvider.Claude:
@@ -255,5 +345,37 @@ export class AppService {
       default:
         throw new Error('unknown AI_PROVIDER type selected');
     }
+  }
+
+  private prepareChatRequest(session: Record<string, any>, request: string) {
+    const originalReferralRequest = session[
+      'referralRequest'
+    ] as ReferralRequest;
+    const originalReferralResponse = session[
+      'referralResponse'
+    ] as ReferralResponse;
+    let previousConversations: Record<string, SpecialistAIResponse>[] = session[
+      'previousPathwayConversations'
+    ] as Record<string, SpecialistAIResponse>[];
+    if (previousConversations == null) {
+      previousConversations = [];
+    }
+
+    let originalSpecialistAIResponse: SpecialistAIResponse =
+      new SpecialistAIResponse();
+    if (
+      originalReferralResponse &&
+      originalReferralResponse.specialistAIResponse
+    ) {
+      originalSpecialistAIResponse =
+        originalReferralResponse.specialistAIResponse;
+    }
+    return new ChatRequest(
+      request,
+      originalReferralRequest.question,
+      originalReferralRequest.clinicalNotes,
+      originalSpecialistAIResponse.summaryResponse,
+      previousConversations,
+    );
   }
 }

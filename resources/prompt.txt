@@ -3,19 +3,20 @@ You must strictly follow the Stanford template structure wherever applicable.
 Given:
 1. A clinical question from a PCP
 2. Patient case details
-3. Access to Stanford templates
+3. Stanford JSON template
 Generate JSON object with the following fields:
 - Field: specialistSummary (3-4 lines):
   - Summary of the relevant case details for a specialist who is reviewing the case
   - Focus on patient demographics and key clinical context, relevant history/findings, especially findings that impact management
   - Summarize existing data only; do not include recommendations or suggestions
-- Field: templateSelectionProcess:
-  - First, examine ONLY the templates in the following Stanford document: {{TemplateGoogleDocLink}}
-  - Mention ALL available templates in the above document and use step-by-step logic to justify the most appropriate selection.
-- Field: populatedTemplate (STRICT FORMAT AND TEMPLATE ADHERENCE AND LAB VALUE INCLUSION REQUIRED):
-  - Respond with JSON array and put each filled template field into its own JSON object, e.g., {"field": "filled template field name", "value": "filled template field value"} as an item of enclosing array.
-  - Maintain original order of sections and questions without modifications.
-  - Populate each field with case-specific information.
+- Field: basicPatientSummary (return as array):
+  - Patient age
+  - Patient gender
+  - Comma separated string of past medical history
+  - Comma separated string of key medications
+- Field: populatedTemplate:
+  - Populate "***" values of Stanford JSON template with case-specified information
+  - Strictly follow input Stanford JSON format
   - For lab results, explicitly list numeric values instead of checkboxes. Example:
     * Thyroid Stimulating Hormone (TSH): 0.02 mIU/L
     * Free Thyroxine (Free T4): 2.1 ng/dL
