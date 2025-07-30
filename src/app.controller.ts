@@ -6,6 +6,7 @@ import {
   Post,
   Session,
   Sse,
+  UseGuards,
 } from '@nestjs/common';
 import { AppService } from './app.service';
 
@@ -15,8 +16,10 @@ import { ApiBody, ApiCreatedResponse, ApiOkResponse } from '@nestjs/swagger';
 import { Observable } from 'rxjs';
 import { SpecialistAIResponse } from './models/specialistAIResponse';
 import { SessionKeys } from './const';
+import { ApiKeyGuard } from './guards/apikey.guard';
 
 @Controller()
+@UseGuards(ApiKeyGuard)
 export class AppController {
   private readonly logger = new Logger(AppController.name);
 
