@@ -1,15 +1,15 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { PathwayService } from './pathway.service';
+import { LlmSelectorService } from './llm-selector.service';
 
-describe('PathwayService', () => {
-  let service: PathwayService;
+describe('LlmSelectorService', () => {
+  let service: LlmSelectorService;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
-      providers: [PathwayService],
+      providers: [LlmSelectorService],
     }).compile();
 
-    service = module.get<PathwayService>(PathwayService);
+    service = module.get<LlmSelectorService>(LlmSelectorService);
   });
 
   it('should be defined', () => {

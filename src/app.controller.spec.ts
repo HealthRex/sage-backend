@@ -4,7 +4,7 @@ import { AppService } from './app.service';
 import { LLMResponse } from './models/llmResponse';
 import { TemplateSelectorService } from './template-selector/template-selector.service';
 import { HttpModule } from '@nestjs/axios';
-import { PathwayService } from './pathway/pathway.service';
+import { SpecialistAiService } from './specialist-ai/specialist-ai.service';
 
 describe('AppController', () => {
   let appController: AppController;
@@ -12,7 +12,7 @@ describe('AppController', () => {
   beforeEach(async () => {
     const app: TestingModule = await Test.createTestingModule({
       controllers: [AppController],
-      providers: [AppService, TemplateSelectorService, PathwayService],
+      providers: [AppService, TemplateSelectorService, SpecialistAiService],
       imports: [HttpModule],
     }).compile();
 

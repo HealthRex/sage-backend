@@ -1,20 +1,20 @@
 ### Gemini followup questions
 GET {{assist-pc-backend-url}}/followup-questions
 
-### Pathway chatbot question
-POST {{assist-pc-backend-url}}/ask-pathway
+### Specialist chatbot question
+POST {{assist-pc-backend-url}}/ask-specialist
 Content-Type: application/json
 
 {
   "question": "What further procedures would you recommend?"
 }
 
-### Pathway chatbot question streamed
-POST {{assist-pc-backend-url}}/ask-pathway-streamed
+### Specialist chatbot question streamed
+POST {{assist-pc-backend-url}}/ask-specialist-streamed
 Content-Type: application/json
 
 {
-  "question": "Understood. Any other diagnoses?"
+  "question": "Do any other diagnoses fit the description?"
 }
 
 ### Clinical question with matched template streamed
