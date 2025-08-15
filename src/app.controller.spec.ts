@@ -20,8 +20,8 @@ describe('AppController', () => {
   });
 
   describe('root', () => {
-    it('should return "Hello World!"', () => {
-      expect(appController.getRoot()).toBe('Hello World!');
+    it('should return "Stanford eConsult Backend service"', () => {
+      expect(appController.getRoot()).toBe('Stanford eConsult Backend service');
     });
   });
 
