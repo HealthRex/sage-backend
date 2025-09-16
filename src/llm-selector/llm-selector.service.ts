@@ -11,6 +11,7 @@ enum AIProvider {
   SecureGPT4_1 = 'SECUREGPT4_1',
   SecureGPT5 = 'SECUREGPT5',
   SecureGPT5Mini = 'SECUREGPT5_MINI',
+  SecureGPT5Nano = 'SECUREGPT5_NANO',
   // TODO add further models
 }
 
@@ -41,6 +42,9 @@ export class LlmSelectorService {
         break;
       case AIProvider.SecureGPT5Mini:
         this.model = this.getSecureOpenAiModel('gpt-5-mini');
+        break;
+      case AIProvider.SecureGPT5Nano:
+        this.model = this.getSecureOpenAiModel('gpt-5-nano');
         break;
       default:
         throw new Error('unknown AI_PROVIDER type selected');
