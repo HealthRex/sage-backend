@@ -1,9 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
 import {
-  CoreMessage,
   FilePart,
   generateObject,
   ImagePart,
+  ModelMessage,
   streamObject,
   TextPart,
   UserContent,
@@ -222,7 +222,7 @@ export class AppService {
           string,
           SpecialistAIResponse
         >[]
-      ).at(-1);
+      )[-1];
       for (const question in lastSpecialistConversation) {
         lastSpecialistResponse =
           lastSpecialistConversation[question].summaryResponse;
@@ -263,7 +263,11 @@ export class AppService {
   ): Promise<T> {
     const input = this.prepareLLMInput(systemPrompt, messages, responseSchema);
 
-    const { object } = await generateObject<T>(input);
+    const { object } = await generateObject<
+      z.Schema<any, z.ZodTypeDef, any>,
+      'object',
+      T
+    >(input);
     this.logger.debug('structured response:', object);
 
     return object;
@@ -300,11 +304,11 @@ export class AppService {
         {
           role: 'user',
           content: [] as UserContent,
-        } as CoreMessage,
+        } as ModelMessage,
       ],
       providerOptions: {
         openai: {
-          strictSchemas: true,
+          strictJsonSchema: true,
         } satisfies OpenAIResponsesProviderOptions,
       },
     };
