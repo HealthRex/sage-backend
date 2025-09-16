@@ -1,5 +1,4 @@
-import { z } from 'zod';
-import { ZodTypeAny } from 'zod/lib/types';
+import { z, ZodTypeAny } from 'zod';
 
 // inspired from https://github.com/colinhacks/zod/discussions/585
 export const jsonToZod = (obj: any): z.ZodTypeAny => {
