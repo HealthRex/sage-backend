@@ -4,19 +4,16 @@ import {
   FilePart,
   generateObject,
   ImagePart,
-  LanguageModelV1,
   streamObject,
   TextPart,
   UserContent,
 } from 'ai';
-import { anthropic } from '@ai-sdk/anthropic';
-import { google } from '@ai-sdk/google';
 import { ReferralRequest } from './models/referralRequest';
 import * as fs from 'node:fs';
 import { join } from 'path';
 import { ReferralResponse } from './models/referralResponse';
 import { TemplateSelectorService } from './template-selector/template-selector.service';
-import { PathwayService } from './pathway/pathway.service';
+import { SpecialistAiService } from './specialist-ai/specialist-ai.service';
 import { SpecialistAIResponse } from './models/specialistAIResponse';
 import { map, Observable, tap } from 'rxjs';
 import { fromReadableStreamLike } from 'rxjs/internal/observable/innerFrom';
@@ -25,12 +22,8 @@ import { z } from 'zod';
 import { ChatRequest } from './models/chatRequest';
 import { SessionKeys } from './const';
 import { plainToInstance } from 'class-transformer';
-
-enum AIProvider {
-  Claude = 'CLAUDE',
-  Gemini = 'GEMINI',
-  // TODO add further models
-}
+import { OpenAIResponsesProviderOptions } from '@ai-sdk/openai';
+import { LlmSelectorService } from './llm-selector/llm-selector.service';
 
 const systemPromptFilePath: string = './resources/prompt.txt';
 const systemPromptWithoutTemplatesFilePath: string =
@@ -43,8 +36,9 @@ export class AppService {
   private readonly logger = new Logger(AppService.name);
 
   constructor(
+    private readonly llmSelectorService: LlmSelectorService,
     private readonly templateSelectorService: TemplateSelectorService,
-    private readonly pathwayService: PathwayService,
+    private readonly specialistAiService: SpecialistAiService,
   ) {}
 
   getRoot(): string {
@@ -70,12 +64,10 @@ export class AppService {
     llmResponse = plainToInstance(ReferralResponse, llmResponse);
     llmResponse.populatedTemplate =
       llmResponse.postProcessedPopulatedTemplate();
-    const pathwayResponse: SpecialistAIResponse = await this.queryPathway(
-      request,
-      llmResponse,
-    );
+    const specialistAIResponse: SpecialistAIResponse =
+      await this.querySpecialistAi(request, llmResponse);
     const response: ReferralResponse = llmResponse as ReferralResponse;
-    response.specialistAIResponse = pathwayResponse;
+    response.specialistAIResponse = specialistAIResponse;
 
     this.logger.debug(JSON.stringify(response, null, 2));
 
@@ -110,8 +102,8 @@ export class AppService {
           accumulatedResponse = next;
           session[SessionKeys.REFERRAL_RESPONSE] = accumulatedResponse;
 
-          // reset Pathway conversation history on new referral request
-          session[SessionKeys.PREVIOUS_PATHWAY_CONVERSATIONS] = [];
+          // reset Specialist AI conversation history on new referral request
+          session[SessionKeys.PREVIOUS_SPECIALIST_CONVERSATIONS] = [];
 
           this.logger.debug('LLM partial response: ', JSON.stringify(next));
           subscriber.next({ data: next });
@@ -121,7 +113,7 @@ export class AppService {
           subscriber.error(reason);
         },
         complete: () => {
-          this.queryPathwayStreamed(request, accumulatedResponse)
+          this.querySpecialistAiStreamed(request, accumulatedResponse)
             .pipe(
               map((specialistAIResponse: SpecialistAIResponse) => {
                 accumulatedResponse.specialistAIResponse = specialistAIResponse;
@@ -144,22 +136,22 @@ export class AppService {
     });
   }
 
-  async postPathwayQuestion(
+  async postSpecialistQuestion(
     request: string,
     session: Record<string, any>,
   ): Promise<SpecialistAIResponse> {
     const chatRequest: ChatRequest = this.prepareChatRequest(session, request);
-    return this.pathwayService.retrieveChatAnswer(chatRequest);
+    return this.specialistAiService.retrieveChatAnswer(chatRequest);
   }
 
-  postPathwayQuestionStreamed(
+  postSpecialistQuestionStreamed(
     request: string,
     session: Record<string, any>,
   ): Observable<{ data: SpecialistAIResponse }> {
     const chatRequest: ChatRequest = this.prepareChatRequest(session, request);
     let accumulatedResponse: SpecialistAIResponse;
     return new Observable((subscriber) => {
-      this.pathwayService
+      this.specialistAiService
         .retrieveChatAnswerStreamed(chatRequest)
         .pipe(
           tap((next) => {
@@ -175,7 +167,7 @@ export class AppService {
           },
           complete: () => {
             (
-              session[SessionKeys.PREVIOUS_PATHWAY_CONVERSATIONS] as Record<
+              session[SessionKeys.PREVIOUS_SPECIALIST_CONVERSATIONS] as Record<
                 string,
                 SpecialistAIResponse
               >[]
@@ -185,15 +177,21 @@ export class AppService {
             subscriber.complete();
           },
           error: (reason) => {
-            this.logger.error('error querying Pathway: ', reason, chatRequest);
+            this.logger.error(
+              'error querying Specialist AI: ',
+              reason,
+              chatRequest,
+            );
             subscriber.error(reason);
           },
         });
     });
   }
 
-  generateFollowupQuestions(session: Record<string, any>): Promise<string[]> {
-    const systemPrompt = fs
+  generateFollowupQuestions(
+    session: Record<string, any>,
+  ): Promise<{ questions: string[] }> {
+    const systemPrompt: string = fs
       .readFileSync(join(process.cwd(), systemPromptFollowupQuestionsFilePath))
       .toString();
 
@@ -215,29 +213,34 @@ export class AppService {
       );
     }
 
-    let lastPathwayResponse = (
+    let lastSpecialistResponse = (
       session[SessionKeys.REFERRAL_RESPONSE] as ReferralResponse
     ).specialistAIResponse?.summaryResponse;
-    if (session[SessionKeys.PREVIOUS_PATHWAY_CONVERSATIONS] != null) {
-      const lastPathwayConversation = (
-        session[SessionKeys.PREVIOUS_PATHWAY_CONVERSATIONS] as Record<
+    if (session[SessionKeys.PREVIOUS_SPECIALIST_CONVERSATIONS] != null) {
+      const lastSpecialistConversation = (
+        session[SessionKeys.PREVIOUS_SPECIALIST_CONVERSATIONS] as Record<
           string,
           SpecialistAIResponse
         >[]
       ).at(-1);
-      for (const question in lastPathwayConversation) {
-        lastPathwayResponse = lastPathwayConversation[question].summaryResponse;
+      for (const question in lastSpecialistConversation) {
+        lastSpecialistResponse =
+          lastSpecialistConversation[question].summaryResponse;
       }
     }
     const request = [
       'Clinical question: ' +
         (session[SessionKeys.REFERRAL_REQUEST] as ReferralRequest).question,
-      'LLM-generated specialist response: ' + lastPathwayResponse,
+      'LLM-generated specialist response: ' + lastSpecialistResponse,
     ];
 
-    const responseSchema = z.string().array();
+    const responseSchema = z.object({ questions: z.string().array() });
 
-    return this.queryLLM<string[]>(systemPrompt, request, responseSchema);
+    return this.queryLLM<{ questions: string[] }>(
+      systemPrompt,
+      request,
+      responseSchema,
+    );
   }
 
   private selectSystemPrompt(bestTemplate: string) {
@@ -290,7 +293,7 @@ export class AppService {
     responseSchema: z.Schema<any, z.ZodTypeDef, any>,
   ) {
     const input = {
-      model: this.selectModel(),
+      model: this.llmSelectorService.selectModel(),
       schema: responseSchema,
       system: systemPrompt,
       messages: [
@@ -299,6 +302,11 @@ export class AppService {
           content: [] as UserContent,
         } as CoreMessage,
       ],
+      providerOptions: {
+        openai: {
+          strictSchemas: true,
+        } satisfies OpenAIResponsesProviderOptions,
+      },
     };
 
     for (const message of messages) {
@@ -314,48 +322,37 @@ export class AppService {
     return input;
   }
 
-  private async queryPathway(
+  private async querySpecialistAi(
     request: ReferralRequest,
     response: LLMResponse,
   ): Promise<SpecialistAIResponse> {
-    return await this.pathwayService.retrieveAnswer(
+    return await this.specialistAiService.retrieveAnswer(
       request.question,
       request.clinicalNotes,
       response.populatedTemplate,
     );
   }
 
-  private queryPathwayStreamed(
+  private querySpecialistAiStreamed(
     request: ReferralRequest,
     response: LLMResponse,
   ): Observable<SpecialistAIResponse> {
-    return this.pathwayService.retrieveAnswerStreamed(
+    return this.specialistAiService.retrieveAnswerStreamed(
       request.question,
       request.clinicalNotes,
       response.populatedTemplate,
     );
-  }
-
-  private selectModel(): LanguageModelV1 {
-    switch (String(process.env.AI_PROVIDER).toUpperCase() as AIProvider) {
-      case AIProvider.Claude:
-        return anthropic('claude-3-opus-20240229');
-      case AIProvider.Gemini:
-        return google('models/gemini-2.0-flash');
-      default:
-        throw new Error('unknown AI_PROVIDER type selected');
-    }
   }
 
   private prepareChatRequest(session: Record<string, any>, request: string) {
     const originalReferralRequest = session[
-      'referralRequest'
+      SessionKeys.REFERRAL_REQUEST
     ] as ReferralRequest;
     const originalReferralResponse = session[
-      'referralResponse'
+      SessionKeys.REFERRAL_RESPONSE
     ] as ReferralResponse;
     let previousConversations: Record<string, SpecialistAIResponse>[] = session[
-      'previousPathwayConversations'
+      SessionKeys.PREVIOUS_SPECIALIST_CONVERSATIONS
     ] as Record<string, SpecialistAIResponse>[];
     if (previousConversations == null) {
       previousConversations = [];

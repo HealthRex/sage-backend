@@ -41,8 +41,8 @@ export class AppController {
 
     const response = await this.appService.postReferralQuestion(request);
     session[SessionKeys.REFERRAL_RESPONSE] = response;
-    // reset Pathway conversation history on new referral request
-    session[SessionKeys.PREVIOUS_PATHWAY_CONVERSATIONS] = [];
+    // reset Specialist AI conversation history on new referral request
+    session[SessionKeys.PREVIOUS_SPECIALIST_CONVERSATIONS] = [];
 
     return response;
   }
@@ -64,7 +64,7 @@ export class AppController {
     return await this.appService.postReferralQuestionStreamed(request, session);
   }
 
-  @Post('/ask-pathway')
+  @Post('/ask-specialist')
   @ApiBody({
     schema: {
       properties: {
@@ -74,22 +74,22 @@ export class AppController {
   })
   @ApiCreatedResponse({
     description:
-      'Successfully received Pathway AI response to a clarifying question.',
+      'Successfully received Specialist AI response to a clarifying question.',
     type: SpecialistAIResponse,
   })
-  async postPathwayQuestion(
+  async postSpecialistQuestion(
     @Session() session: Record<string, any>,
     @Body('question') question: string,
   ): Promise<SpecialistAIResponse> {
     this.logger.debug('controller request', question);
     this.logger.debug('session', session);
     const response: SpecialistAIResponse =
-      await this.appService.postPathwayQuestion(question, session);
-    if (session[SessionKeys.PREVIOUS_PATHWAY_CONVERSATIONS] == null) {
-      session[SessionKeys.PREVIOUS_PATHWAY_CONVERSATIONS] = [];
+      await this.appService.postSpecialistQuestion(question, session);
+    if (session[SessionKeys.PREVIOUS_SPECIALIST_CONVERSATIONS] == null) {
+      session[SessionKeys.PREVIOUS_SPECIALIST_CONVERSATIONS] = [];
     }
     (
-      session[SessionKeys.PREVIOUS_PATHWAY_CONVERSATIONS] as Record<
+      session[SessionKeys.PREVIOUS_SPECIALIST_CONVERSATIONS] as Record<
         string,
         SpecialistAIResponse
       >[]
@@ -99,7 +99,7 @@ export class AppController {
     return response;
   }
 
-  @Post('/ask-pathway-streamed')
+  @Post('/ask-specialist-streamed')
   @Sse()
   @ApiBody({
     schema: {
@@ -110,19 +110,19 @@ export class AppController {
   })
   @ApiOkResponse({
     description:
-      'Successfully received streamed Pathway AI response to a clarifying question.',
+      'Successfully received streamed Specialist AI response to a clarifying question.',
     type: SpecialistAIResponse,
   })
-  postPathwayQuestionStreamed(
+  postSpecialistQuestionStreamed(
     @Session() session: Record<string, any>,
     @Body('question') question: string,
   ): Observable<{ data: SpecialistAIResponse }> {
     this.logger.debug('controller request', question);
     this.logger.debug('session', session);
-    if (session[SessionKeys.PREVIOUS_PATHWAY_CONVERSATIONS] == null) {
-      session[SessionKeys.PREVIOUS_PATHWAY_CONVERSATIONS] = [];
+    if (session[SessionKeys.PREVIOUS_SPECIALIST_CONVERSATIONS] == null) {
+      session[SessionKeys.PREVIOUS_SPECIALIST_CONVERSATIONS] = [];
     }
-    return this.appService.postPathwayQuestionStreamed(question, session);
+    return this.appService.postSpecialistQuestionStreamed(question, session);
   }
 
   @Get('/followup-questions')
@@ -133,7 +133,7 @@ export class AppController {
   })
   generateFollowupQuestions(
     @Session() session: Record<string, any>,
-  ): Promise<string[]> {
+  ): Promise<{ questions: string[] }> {
     this.logger.debug('controller request for followup questions generation');
     this.logger.debug('session', session);
     return this.appService.generateFollowupQuestions(session);
